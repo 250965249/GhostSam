@@ -300,7 +300,7 @@ internal class KsudUpgradeState(
                     toast(
                         context.getString(
                             R.string.ksud_load_failed,
-                            output?.take(160) ?: "channel error",
+                            output?.text?.take(160) ?: "channel error",
                         ),
                     )
                 }

@@ -51,17 +51,19 @@ object SuDaemonChannel {
             out
         }
 
+    data class LateLoadResult(val text: String, val status: Int)
+
     suspend fun execLateLoad(
         timeoutMillis: Long = 60_000,
         onChunk: (String) -> Unit = {},
-    ): String? = withContext(Dispatchers.IO) {
+    ): LateLoadResult? = withContext(Dispatchers.IO) {
         if (!isAvailable()) return@withContext null
         val result = LocalSuDaemon.lateLoad(timeoutMillis, onChunk)
         if (result == null) {
             invalidateCache()
             null
         } else {
-            result.first.trim()
+            LateLoadResult(result.first.trim(), result.second)
         }
     }
 

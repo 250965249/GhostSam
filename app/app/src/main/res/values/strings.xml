@@ -17,35 +17,12 @@
     <string name="home_status_ksu_enabled_detail">Tap to open manager</string>
     <string name="home_status_noksu_enabled">Temporary root channel</string>
     <string name="home_status_noksu_enabled_detail">KernelSU not loaded · socket channel active until reboot</string>
-    <string name="home_status_persist">Persistence ready</string>
-    <string name="home_status_persist_detail">Service component in place · tap to activate</string>
     <string name="home_status_standalone">Ready</string>
     <string name="home_status_standalone_detail">Tap to execute for temporary root</string>
     <string name="home_status_next_spoofed_hint">Spoofed manager is found by signature scan (first check may be slower)</string>
-    <string name="persist_run_ok">Chain executed</string>
-    <string name="persist_run_toast">Persistence chain: %1$s</string>
-    <string name="persist_run_busy">Persistence chain is running</string>
-    <string name="persist_host_line">Host %1$s (pid %2$d) · triggered %3$d time(s)</string>
-    <string name="persist_host_pending">Service component in place · waiting for first activation</string>
-    <string name="persist_log_start">Persistence run: triggering service component</string>
-    <string name="persist_log_trigger_ok">Trigger accepted</string>
-    <string name="persist_log_trigger_fail">Trigger failed: %1$s</string>
-    <string name="persist_log_host">Host %1$s (uid %2$d · pid %3$d) · triggered %4$d time(s)</string>
-    <string name="persist_log_drive">Driving chain (hop → check → arm → trigger)</string>
-    <string name="persist_log_running">Chain running… (%1$d s elapsed, minutes are normal during arm)</string>
-    <string name="persist_log_done">Persistence chain complete</string>
-    <string name="persist_log_fail">Persistence chain failed: %1$s</string>
-    <string name="persist_log_no_response">No response (timeout or service unavailable)</string>
-    <string name="persist_log_not_installed">Service component not installed</string>
-    <string name="persist_log_companion_uid">Companion runs with unexpected uid=%1$d (expected system 1000), reinstall it and verify the signature injection</string>
-    <string name="persist_log_companion_stale">Companion is outdated (v%1$d &lt; bundled v%2$d), update it from Settings first</string>
-    <string name="persist_log_ksu_wait">waiting for KernelSU to come up (typically ~10s)</string>
-    <string name="persist_log_ksu_up">KernelSU loaded (second stage effective)</string>
-    <string name="persist_log_ksu_pending">KernelSU still loading (usually effective in ~10s, check home later)</string>
     <string name="home_root_tmp_mode">temporary root channel</string>
     <string name="home_status_working">Executing</string>
     <string name="home_status_working_detail">Race in progress, keep waiting…</string>
-    <string name="home_status_working_detail_persist">Persist chain activating, keep waiting…</string>
     <string name="home_root_success_at">root acquired %1$s</string>
     <string name="home_root_success_unknown">root acquired</string>
     <string name="home_root_su_granted">su granted to this app</string>
@@ -113,7 +90,7 @@
     <string name="ksud_file_read_failed">Cannot read the selected ksud file</string>
     <string name="selinux_noksu_permissive_locked">Switching to enforcing is disabled in temporary channel mode</string>
 
-    <!-- Execution params (More page) / 执行参数 -->
+    <!-- Execution params (More page) -->
     <string name="section_ksu_mode">KernelSU mode</string>
     <string name="section_exploit_params">Exploit</string>
     <string name="section_debug">Debug</string>
@@ -125,7 +102,7 @@
     <string name="exploit_params_fallback">Same-line fallback</string>
     <string name="exploit_params_fallback_summary">Borrow params from the nearest build with the same codename (experimental, may not match)</string>
     <string name="exploit_debug">Debug logging</string>
-    <string name="exploit_debug_summary">Enable payload pr_debug and component debug logs (diagnostics)</string>
+    <string name="exploit_debug_summary">Enable payload pr_debug and chain debug logs (diagnostics)</string>
     <string name="exploit_load_gate">Low-load check</string>
     <string name="exploit_load_gate_summary">Pause until loadavg drops below the threshold</string>
     <string name="exploit_load_threshold">Load threshold</string>
@@ -139,8 +116,8 @@
     <string name="range_format">Range: %1$s - %2$s</string>
     <string name="hex_input_hint">Hex value, e.g. 0x103878</string>
 
-    <!-- Custom param line (ghostlock-lines.conf) / 自定义参数线 -->
-    <!-- Field titles = the Key itself (CUSTOM_FIELD_KEYS); below: field descriptions / 字段标题 = Key 本身 -->
+    <!-- Custom param line (ghostlock-lines.conf) -->
+    <!-- Field titles = the Key itself (CUSTOM_FIELD_KEYS); below: field descriptions -->
     <string name="section_custom_params">Custom params</string>
     <string name="custom_params_enabled">Custom parameter line</string>
     <string name="custom_params_enabled_summary">Use a custom kernel line (matched by device + build, or manual)</string>
@@ -178,14 +155,13 @@
     <string name="settings_exec_busy_hint">Run in progress, switching disabled</string>
     <string name="settings_scheme">Root method</string>
     <string name="settings_scheme_summary_default">Loads KernelSU directly</string>
-    <string name="settings_scheme_summary_dfr">Temp root first, then KernelSU loads</string>
     <string name="settings_scheme_summary_standalone">No companion/debugging/ADB — run from the home card</string>
     <string name="settings_scheme_default">Ghostlock</string>
-    <string name="settings_scheme_dfr">GhostLock · DirtyFrag</string>
     <string name="settings_scheme_standalone">DirtyFrag</string>
+    <string name="settings_scheme_default_notice">This scheme was fixed in the Samsung October 2026 patch; if your device is unpatched, you can try it, or adjust the offsets in More settings</string>
     <string name="settings_ksud_variant">KernelSU version</string>
-    <string name="settings_ksud_variant_default">KernelSU (3.3.0 · 32601)</string>
-    <string name="settings_ksud_variant_next">KernelSU-Next (3.4.0 · 33294)</string>
+    <string name="settings_ksud_variant_default">KernelSU (3.3.1 · 32680)</string>
+    <string name="settings_ksud_variant_next">KernelSU-Next (3.4.2 · 33355)</string>
     <string name="settings_ksud_variant_summary">Takes effect on the next run, reboot to replace the kernel</string>
     <string name="settings_ksud_variant_locked">Switchable only on DirtyFrag (standalone)</string>
     <string name="settings_ksud_variant_active">Root active · reboot to switch</string>
@@ -195,60 +171,6 @@
     <string name="settings_pin_probe_supported">Page-cache writes supported</string>
     <string name="settings_pin_probe_unavailable">Cannot check in this environment</string>
     <string name="settings_pin_probe_copied">Page-cache writes unsupported, runs will be blocked</string>
-    <string name="settings_companion_uninstall">Uninstall</string>
-    <string name="settings_companion_install">Install service component</string>
-    <string name="settings_companion_install_summary">Install the built-in service component (v%1$s)</string>
-    <string name="settings_companion_update">Update service component</string>
-    <string name="settings_companion_update_summary">Built-in v%1$s → v%2$s (restart to take effect)</string>
-    <string name="settings_companion_install_confirm_title">Install service component?</string>
-    <string name="settings_companion_install_confirm_body">If the injection is not ready, it is applied first and the framework restarts, taking about 1 minute, and the app exits</string>
-    <string name="settings_companion_update_confirm_title">Update service component?</string>
-    <string name="settings_companion_update_confirm_body">Installs built-in v%1$s over the current v%2$s, then restarts the framework, taking about 1 minute, and the app exits</string>
-    <string name="settings_companion_install_started">Installing…</string>
-    <string name="settings_companion_install_no_root">Installing the service component needs root (unavailable)</string>
-    <string name="settings_companion_install_done">Service component installed (v%1$s)</string>
-    <string name="settings_companion_install_channel_push">No root: installing via the wireless-debugging/Shizuku channel…</string>
-    <string name="settings_companion_install_channel_fail">Channel install failed: %1$s</string>
-    <string name="settings_companion_install_need_inject">Install refused: signature injection not in effect (injection is a one-time root step)</string>
-    <string name="settings_companion_install_channel_uid">Installed but running as uid=%1$d (expected 1000), signature injection not in effect</string>
-    <string name="settings_companion_update_channel_pending">Component updated (v%1$s), new code activates after the host service restarts (device reboot)</string>
-    <string name="settings_companion_uninstall_via_channel">No root: uninstalling via the wireless-debugging/Shizuku channel…</string>
-    <string name="settings_companion_install_failed">Install incomplete: %1$s</string>
-    <string name="settings_companion_install_reboot_pending">Install sequence dispatched, framework restarting, reopen this page later to see the result</string>
-    <string name="settings_companion_update_reboot_pending">Restart sequence dispatched, system services restarting, reopen this page later to see the result</string>
-    <string name="settings_companion_install_timeout">Install did not finish within the expected time, reopen this page later or check the log</string>
-    <string name="settings_companion_uninstall_summary">Uninstall the service component, optionally keeping the injection</string>
-    <string name="settings_companion_uninstall_confirm_title">Uninstall service component?</string>
-    <string name="settings_companion_uninstall_confirm_body">Uninstalls the service component and cleans up leftover files, choose below whether to keep the signature injection</string>
-    <string name="settings_companion_state_installed">service component: installed (v%1$s)</string>
-    <string name="settings_companion_state_installed_plain">service component: installed</string>
-    <string name="settings_companion_state_absent">service component: not installed</string>
-    <string name="settings_companion_inject_unknown">Signature injection: not checked</string>
-    <string name="settings_companion_inject_checking">Signature injection: checking…</string>
-    <string name="settings_companion_inject_effective">Signature injection: effective (component runs as system uid)</string>
-    <string name="settings_companion_inject_noroot">Signature injection: unknown (no root, cannot check)</string>
-    <string name="settings_companion_inject_injected">Signature injection: injected</string>
-    <string name="settings_companion_inject_absent">Signature injection: absent</string>
-    <string name="settings_companion_inject_failed">Signature injection: check failed</string>
-    <string name="settings_companion_uninstall_keep">Keep signature injection</string>
-    <string name="settings_companion_uninstall_keep_summary">When on, reinstall needs no re-injection, and when off, the injection is removed too</string>
-    <string name="settings_companion_uninstall_keep_locked">Removing the injection needs root (unavailable), the injection will be kept</string>
-    <string name="settings_companion_uninstall_fallback">Root unavailable, trying the service component self-uninstall path</string>
-    <string name="settings_companion_uninstall_no_root">root is required (the service component self-uninstall path is unavailable on this device)</string>
-    <string name="settings_companion_inject_kept">Signature injection kept (reinstall directly)</string>
-    <string name="settings_companion_inject_removed">Signature injection removed (applies after reboot, reinstall needs re-injection)</string>
-    <string name="settings_companion_inject_remove_failed">Failed to remove injection: %1$s</string>
-    <string name="settings_companion_inject_remove">Remove signature injection</string>
-    <string name="settings_companion_inject_remove_summary">Remove the service component signature injection (root required, applies after reboot)</string>
-    <string name="settings_companion_inject_remove_confirm_title">Remove signature injection?</string>
-    <string name="settings_companion_inject_remove_confirm_body">Removes the service component injection record (fully applied after reboot), reinstall will need re-injection, and it is best done after the component is uninstalled</string>
-    <string name="settings_companion_inject_remove_started">Removing…</string>
-    <string name="settings_companion_inject_skipped_installed">Service component still installed, injection left untouched (shared-uid signature safety)</string>
-    <string name="settings_companion_uninstall_busy">Uninstalling, please wait</string>
-    <string name="settings_companion_uninstall_started">Uninstall accepted, running…</string>
-    <string name="settings_companion_uninstall_done">Service component uninstalled</string>
-    <string name="settings_companion_uninstall_failed">Uninstall incomplete: %1$s</string>
-    <string name="settings_companion_uninstall_no_reply">timeout or service component not responding</string>
     <string name="settings_use_shizuku">Use Shizuku</string>
     <string name="settings_use_shizuku_summary">Default uses built-in wireless debugging, enable to switch back to the Shizuku route</string>
     <string name="settings_tcp_persist">TCP mode</string>
@@ -273,7 +195,6 @@
     <string name="home_no_wifi_waiting_detail">TCP mode on, activates after the next wireless-debugging connection</string>
     <string name="settings_skip_ksu">Skip KernelSU loading</string>
     <string name="settings_skip_ksu_summary">When on, ksud is not loaded and the exploit restores enforcing itself, root stays via the temp socket (requires an adapted payload)</string>
-    <string name="settings_skip_ksu_summary_dfr">Not skipped on DFR: KernelSU is loaded by the second stage (base chain skips KernelSU and uses the temporary root channel)</string>
     <string name="settings_allow_shell">Allow shell su</string>
     <string name="settings_allow_shell_summary">Add the shell user to the KernelSU allowlist when it loads, so adb shell can su directly</string>
     <string name="settings_auto_soft_reboot">Auto soft reboot</string>
@@ -355,11 +276,9 @@
     <string name="color_blue_grey">Blue grey</string>
     <string name="color_sakura">Sakura</string>
 
-    <!-- Exploit log panel / exploit 日志面板 -->
+    <!-- Exploit log panel -->
     <string name="exploit_title">Execute Exploit</string>
     <string name="exploit_keep_open">Keep the page open while the race runs</string>
-    <string name="exploit_status_running_persist">Persist chain activating…</string>
-    <string name="exploit_keep_open_persist">Keep the page open while the persist chain runs</string>
     <string name="exploit_status_running">Working…</string>
     <string name="exploit_status_succeeded">Root granted</string>
     <string name="exploit_status_failed">Failed</string>
@@ -367,7 +286,6 @@
     <string name="exploit_log_empty">Preparing…</string>
     <string name="exploit_retry">Retry</string>
     <string name="exploit_done">Done</string>
-
 
     <string name="exploit_fail_shizuku">No privileged channel (wireless debugging not connected / Shizuku not granted)</string>
     <string name="exploit_fail_manager_missing">KernelSU Manager is not installed, install it before running</string>
@@ -385,41 +303,20 @@
     <string name="exploit_fail_kernel_mismatch">Kernel %1$s does not match %2$s series (expects %3$s)</string>
     <string name="exploit_fail_pack_unsupported_short">Unrecognized device series, nothing was sent (see log)</string>
     <string name="exploit_fail_kernel_mismatch_short">Kernel does not match this series, nothing was sent (see log)</string>
-    <string name="exploit_fail_kernel_window">Kernel %1$s is in the 6.1.72+ dead zone (splice facade backport): DirtyFrag is unreachable — only early firmware (≤6.1.71) works</string>
-    <string name="exploit_fail_kernel_window_short">Kernel is in the 6.1.72+ dead zone, nothing was run (see log)</string>
     <string name="exploit_fail_scheme_unsupported_short">DFR files unavailable, nothing was run (see log)</string>
-    <string name="exploit_fail_companion_stale">Companion outdated, update it from Settings</string>
     <string name="exploit_fail_standalone">Run failed, see the run log</string>
     <string name="standalone_log_build_unlisted">build %1$s not listed for %2$s (%3$d recorded)</string>
-    <string name="exploit_fail_companion_invalid">Companion identity invalid, reinstall it</string>
-    <string name="exploit_fail_scheme_no_assets">This build does not include the DFR files (payloads/dirtyfrag), switch back to Default</string>
-    <string name="exploit_fail_scheme_kmi">No usable DFR files for device KMI %1$s (bundled: %2$s), nothing was run</string>
-    <string name="exploit_log_dfr_staged">DFR: second-stage files written (kmi=%1$s)</string>
-    <string name="exploit_log_dfr_stage">DFR: running second stage (kmi=%1$s, enforce=0, stay=0)</string>
-    <string name="exploit_log_dfr_ok">DFR: second stage done (helper module unloaded, temporary changes restored)</string>
-    <string name="exploit_log_dfr_fail">DFR: second stage did not succeed (root unaffected, see output above)</string>
-    <string name="exploit_log_dfr_ksud">DFR: loading KernelSU from the temporary session (K channel)</string>
-    <string name="exploit_log_dfr_ksud_ok">DFR: KernelSU loaded and effective</string>
-    <string name="exploit_log_dfr_ksud_fail">DFR: KernelSU load did not succeed (temporary root stays, see output above)</string>
-    <string name="exploit_log_dfr_ksud_retry">DFR: KernelSU load not confirmed yet, retrying (2/2)</string>
-    <string name="exploit_log_dfr_auto_noksu">DFR: KernelSU is loaded by the second stage (base chain skips it)</string>
-    <string name="exploit_log_dfr_enforce">DFR: SELinux=%1$s (KernelSU restores enforcing mode itself)</string>
-    <string name="exploit_log_dfr_enforce_warn">DFR: KernelSU is loaded but enforcing mode was not restored (expected 1 - please note)</string>
-    <string name="exploit_log_dfr_companion_install">DFR: companion not installed, installing now (first time includes signature injection: the framework restarts and the app exits)</string>
-    <string name="exploit_log_dfr_companion_update">DFR: companion outdated (v%1$d → v%2$d), updating now (framework restarts afterwards)</string>
-    <string name="exploit_log_dfr_companion_ok">DFR: companion ready (v%1$s)</string>
-    <string name="exploit_log_dfr_companion_fail">DFR: companion auto-install did not finish: %1$s (install manually from Settings)</string>
     <string name="exploit_fail_timeout">Exploit timed out</string>
     <string name="exploit_fail_stall">Exploit stalled (no new output)</string>
     <string name="exploit_fail_verify">KernelSU verification timed out</string>
     <string name="exploit_fail_unknown">Unexpected failure</string>
 
-    <!-- Exploit run log (app-side, i18n; the [*]/[+]/[-] prefixes live in code) / exploit 执行日志 -->
+    <!-- Exploit run log (app-side, i18n; the [*]/[+]/[-] prefixes live in code) -->
     <string name="exploit_log_channel_ready">privileged channel ready: %1$s</string>
     <string name="exploit_log_shizuku_missing">No privileged channel: wireless debugging not connected and Shizuku not granted</string>
     <string name="exploit_log_manager_present">KernelSU Manager present</string>
     <string name="exploit_log_manager_missing">KernelSU Manager not installed (%1$s), install it first</string>
-    <string name="exploit_log_ksud_variant">ksud variant: %1$s</string>
+    <string name="exploit_log_ksud_variant">ksud version: %1$s</string>
     <string name="exploit_log_root_clean">root check clean</string>
     <string name="exploit_log_already_root">Root already granted, exploit not needed</string>
     <string name="exploit_log_boot_claim_clean">boot claim clean</string>
@@ -477,7 +374,7 @@
     <string name="exploit_log_local_payload">payload: local profile %1$s</string>
     <string name="exploit_fail_payload_missing">Local payload files missing or unreadable</string>
 
-    <!-- Local payload config (home card + profile list page) / 本地 payload 配置 -->
+    <!-- Local payload config (home card + profile list page) -->
     <string name="payload_card_title">Payload Profiles</string>
     <string name="payload_card_summary">%1$d profiles · %2$d proven</string>
     <string name="payload_title">Payload Profiles</string>
@@ -512,7 +409,7 @@
     <string name="payload_builtin_desc_standalone">Bundled ko + ksud</string>
     <string name="payload_kind_standalone">Standalone</string>
 
-    <!-- System tools (Samsung hidden-feature launcher) / 系统工具 -->
+    <!-- System tools (Samsung hidden-feature launcher) -->
     <string name="tools_card_title">System Tools</string>
     <string name="tools_card_summary">Samsung hidden menus · shell · terminal</string>
     <string name="tools_title">System Tools</string>

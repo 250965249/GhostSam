@@ -161,7 +161,6 @@ private fun SettingsMain(
             kernelActivatedNow(context) || SuController.isAvailable()
         }
     }
-    val companionSection = rememberCompanionSectionState(state.payloadScheme)
     val settingsLifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(settingsLifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -215,7 +214,7 @@ private fun SettingsMain(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             ThemeBlock(onOpen = { navigator.push(Route.ColorPalette) })
-            SchemeBlock(state, companionSection, standaloneRoute)
+            SchemeBlock(state, standaloneRoute)
             ExecutionBlock(state, standaloneRoute, useShizuku, tcpStatusText)
             ParamsBlock(state, standaloneRoute, onOpenMore = { navigator.push(Route.More) })
             AboutBlock(onOpenAbout)
@@ -312,7 +311,6 @@ private fun SettingsMain(
         )
     }
 
-    SettingsCompanionDialogs(companionSection)
 }
 
 private fun LazyListScope.ThemeBlock(onOpen: () -> Unit) {
@@ -338,7 +336,6 @@ private fun LazyListScope.ThemeBlock(onOpen: () -> Unit) {
 
 private fun LazyListScope.SchemeBlock(
     state: SettingsMainState,
-    companionSection: CompanionSectionState,
     standaloneRoute: Boolean,
 ) {
     val context = state.context
@@ -357,14 +354,12 @@ private fun LazyListScope.SchemeBlock(
                 title = stringResource(R.string.settings_scheme),
                 summary = stringResource(
                     when (state.payloadScheme) {
-                        PayloadScheme.Dfr -> R.string.settings_scheme_summary_dfr
                         PayloadScheme.DfrStandalone -> R.string.settings_scheme_summary_standalone
                         else -> R.string.settings_scheme_summary_default
                     },
                 ),
                 items = listOf(
                     stringResource(R.string.settings_scheme_default),
-                    stringResource(R.string.settings_scheme_dfr),
                     stringResource(R.string.settings_scheme_standalone),
                 ),
                 startAction = {
@@ -388,6 +383,15 @@ private fun LazyListScope.SchemeBlock(
                     }
                 },
             )
+            // Ghostlock (default scheme) October-patch notice - one line below the scheme selector
+            if (state.payloadScheme == PayloadScheme.Default) {
+                Text(
+                    text = stringResource(R.string.settings_scheme_default_notice),
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+                    fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onBackgroundVariant,
+                )
+            }
             if (state.ksudVariantStatus.isNotEmpty()) {
                 Text(
                     text = state.ksudVariantStatus,
@@ -484,7 +488,6 @@ private fun LazyListScope.SchemeBlock(
                     },
                 )
             }
-            SettingsCompanionSection(companionSection, state.payloadScheme)
         }
     }
 }

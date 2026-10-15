@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.AltRoute
 import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.HourglassTop
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Schedule
@@ -120,7 +121,6 @@ fun MoreScreen(
     val state = rememberMoreScreenState()
 
     val scheme = SettingsPrefs.payloadScheme(context)
-    val dfrRoute = scheme != PayloadScheme.Default
     val standaloneRoute = scheme == PayloadScheme.DfrStandalone
 
     Scaffold(
@@ -157,7 +157,7 @@ fun MoreScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             CustomParamsBlock(state, standaloneRoute)
-            KsuModeBlock(state, dfrRoute, standaloneRoute)
+            KsuModeBlock(state, standaloneRoute)
             ExploitParamsBlock(state, standaloneRoute)
             DebugBlock(state, standaloneRoute)
             AppGatesBlock(state, standaloneRoute)
@@ -256,7 +256,7 @@ private fun LazyListScope.CustomParamsBlock(state: MoreScreenState, standaloneRo
     }
 }
 
-private fun LazyListScope.KsuModeBlock(state: MoreScreenState, dfrRoute: Boolean, standaloneRoute: Boolean) {
+private fun LazyListScope.KsuModeBlock(state: MoreScreenState, standaloneRoute: Boolean) {
     val context = state.context
     item { SectionLabel(stringResource(R.string.section_ksu_mode)) }
     item {
@@ -264,10 +264,7 @@ private fun LazyListScope.KsuModeBlock(state: MoreScreenState, dfrRoute: Boolean
             if (!standaloneRoute) {
             SwitchPreference(
                 title = stringResource(R.string.settings_skip_ksu),
-                summary = stringResource(
-                    if (dfrRoute) R.string.settings_skip_ksu_summary_dfr
-                    else R.string.settings_skip_ksu_summary,
-                ),
+                summary = stringResource(R.string.settings_skip_ksu_summary),
                 startAction = {
                     Icon(
                         Icons.Rounded.Link,
@@ -277,7 +274,6 @@ private fun LazyListScope.KsuModeBlock(state: MoreScreenState, dfrRoute: Boolean
                     )
                 },
                 checked = state.skipKsu,
-                enabled = !dfrRoute,
                 onCheckedChange = {
                     SettingsPrefs.setSkipKsu(context, it)
                     state.skipKsu = it
@@ -335,7 +331,7 @@ private fun LazyListScope.ExploitParamsBlock(state: MoreScreenState, standaloneR
             NumberPreference(
                 title = stringResource(R.string.exploit_walk_timeout),
                 summary = stringResource(R.string.exploit_walk_timeout_summary),
-                valueText = "$state.walkTimeout s",
+                valueText = "${state.walkTimeout} s",
                 icon = Icons.Rounded.Timer,
                 onClick = { state.dialog = NumberDialog(R.string.exploit_walk_timeout, state.walkTimeout.toDouble(), 1.0, 10.0, "s") { state.walkTimeout = it.toInt(); ExploitPrefs.setWalkTimeoutSec(context, it.toInt()) } },
             )
@@ -439,7 +435,7 @@ private fun LazyListScope.AppGatesBlock(state: MoreScreenState, standaloneRoute:
                     NumberPreference(
                         title = stringResource(R.string.exploit_load_wait),
                         summary = stringResource(R.string.exploit_load_wait_summary),
-                        valueText = "$state.loadWaitSec s",
+                        valueText = "${state.loadWaitSec} s",
                         icon = Icons.Rounded.HourglassTop,
                         onClick = { state.dialog = NumberDialog(R.string.exploit_load_wait, state.loadWaitSec.toDouble(), 10.0, 300.0, "s") { state.loadWaitSec = it.toInt(); ExploitPrefs.setLoadWaitMaxSec(context, it.toInt()) } },
                     )
@@ -449,7 +445,7 @@ private fun LazyListScope.AppGatesBlock(state: MoreScreenState, standaloneRoute:
             NumberPreference(
                 title = stringResource(R.string.exploit_stall_timeout),
                 summary = stringResource(R.string.exploit_stall_timeout_summary),
-                valueText = "$state.stallSec s",
+                valueText = "${state.stallSec} s",
                 icon = Icons.Rounded.Timer,
                 onClick = { state.dialog = NumberDialog(R.string.exploit_stall_timeout, state.stallSec.toDouble(), 10.0, 300.0, "s") { state.stallSec = it.toInt(); ExploitPrefs.setStallTimeoutSec(context, it.toInt()) } },
             )
@@ -457,7 +453,7 @@ private fun LazyListScope.AppGatesBlock(state: MoreScreenState, standaloneRoute:
             NumberPreference(
                 title = stringResource(R.string.exploit_total_timeout),
                 summary = stringResource(R.string.exploit_total_timeout_summary),
-                valueText = "$state.totalSec s",
+                valueText = "${state.totalSec} s",
                 icon = Icons.Rounded.Schedule,
                 onClick = { state.dialog = NumberDialog(R.string.exploit_total_timeout, state.totalSec.toDouble(), 60.0, 600.0, "s") { state.totalSec = it.toInt(); ExploitPrefs.setTotalTimeoutSec(context, it.toInt()) } },
             )

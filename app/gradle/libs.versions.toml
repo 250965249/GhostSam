@@ -39,7 +39,7 @@ shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizu
 # libadb-android: wireless-debug bridge — SPAKE2 pairing + TLS + shell/file channels
 libadb-android = { module = "com.github.muntashirakon:libadb-android", version.ref = "libadb" }
 # Android 16 platform Conscrypt dropped exportKeyingMaterial → libadb SPAKE2 pairing needs this
-# Android 16 平台 Conscrypt 移除 exportKeyingMaterial → SPAKE2 配对需自带 Conscrypt
+# Android 16 removed Conscrypt exportKeyingMaterial: SPAKE2 pairing ships its own Conscrypt
 conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "conscrypt" }
 
 miuix-ui = { module = "top.yukonga.miuix.kmp:miuix-ui-android", version.ref = "miuix" }

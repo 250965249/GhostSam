@@ -34,7 +34,7 @@ val keystoreProps = Properties().apply {
 android {
     namespace = "com.snothin.ghostsam"
     compileSdk = 37
-    ndkVersion = "30.0.16248370"
+    ndkVersion = "30.0.15729638"
 
     defaultConfig {
         applicationId = "com.snothin.ghostsam"
@@ -65,6 +65,14 @@ android {
 
     buildTypes {
         debug {
+            // Release-like R8 for debug too (user spec 2026-10-07): product shape/size aligned;
+            // the proguard log rules are empty, so Log stays intact.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
             if (keystoreProps.isNotEmpty()) {
                 signingConfig = signingConfigs.getByName("release")
             }
@@ -124,40 +132,13 @@ kotlin {
     }
 }
 
-abstract class SyncCompanionApkTask : DefaultTask() {
-    @get:InputFile
-    abstract val apk: RegularFileProperty
-
-    @get:OutputDirectory
-    abstract val outputDir: DirectoryProperty
-
-    @TaskAction
-    fun sync() {
-        val dir = outputDir.get().asFile.resolve("companion")
-        dir.mkdirs()
-        dir.resolve("companion.apk").writeBytes(apk.get().asFile.readBytes())
-    }
-}
-
-val syncCompanionApk by tasks.registering(SyncCompanionApkTask::class) {
-    apk.set(layout.projectDirectory.file("../companion/build/outputs/apk/release/companion-release.apk"))
-    outputDir.set(layout.buildDirectory.dir("companion-assets"))
-    dependsOn(":companion:assembleRelease")
-}
-
-androidComponents {
-    onVariants { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(syncCompanionApk) { it.outputDir }
-    }
-}
-
 val verifyPayloads by tasks.registering {
     val payloadsDir = layout.projectDirectory.dir("src/main/assets/payloads").asFile
     val seriesTableFile = layout.projectDirectory
         .file("src/main/java/com/snothin/ghostsam/data/device/SeriesTable.kt").asFile
 
     doLast {
-        val series = mutableListOf<Pair<String, String>>()   // id to kmi
+        val series = mutableListOf<Pair<String, String>>() // id to kmi
         var id: String? = null
         var kmi: String? = null
         seriesTableFile.readLines().forEach { line ->
@@ -196,23 +177,15 @@ val verifyPayloads by tasks.registering {
                 val magic = f.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
                 val elf = magic[0] == 0x7f.toByte() && magic[1] == 'E'.code.toByte() &&
                     magic[2] == 'L'.code.toByte() && magic[3] == 'F'.code.toByte()
-                if (!elf) problems += "$rel: not an ELF (placeholder text rejected)"
+                if (!elf) problems += "$rel: not an ELF (placeholder files are rejected)"
             }
         }
 
         val dfrDir = payloadsDir.resolve("dirtyfrag")
         val dfrKmiFile = Regex("dfr_lkm-(android\\d+-\\d+\\.\\d+)\\.ko")
-        require("dirtyfrag/dfr_payload")
-        val dfrPayload = dfrDir.resolve("dfr_payload")
-        if (dfrPayload.isFile && dfrPayload.length() >= 4) {
-            val magic = dfrPayload.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
-            val elf = magic[0] == 0x7f.toByte() && magic[1] == 'E'.code.toByte() &&
-                magic[2] == 'L'.code.toByte() && magic[3] == 'F'.code.toByte()
-            if (!elf) problems += "dirtyfrag/dfr_payload: not an ELF (placeholder text rejected)"
-        }
         val dfrKos = dfrDir.listFiles { f -> f.isFile && dfrKmiFile.matches(f.name) }?.sorted() ?: emptyList()
         if (dfrKos.isEmpty()) {
-            problems += "missing: dirtyfrag/dfr_lkm-<kmi>.ko (dfr-scheme asset; at least one KMI, produced by the layer repo's pack-dirtyfrag.sh)"
+            problems += "missing: dirtyfrag/dfr_lkm-<kmi>.ko (dfr scheme asset; at least one KMI, from pack-dirtyfrag.sh)"
         }
         dfrKos.forEach { ko ->
             expected += "dirtyfrag/${ko.name}"
@@ -221,20 +194,20 @@ val verifyPayloads by tasks.registering {
 
         payloadsDir.walkTopDown().filter { it.isFile }.forEach { f ->
             val rel = f.relativeTo(payloadsDir).path.replace('\\', '/')
-            if (rel !in expected) problems += "unexpected file: $rel (dir is the manifest; roles are fixed by PackRole)"
+            if (rel !in expected) problems += "unexpected file: $rel (the directory is the manifest; roles are fixed by PackRole)"
         }
 
         if (problems.isNotEmpty()) {
             throw GradleException(
-                "verifyPayloads failed (${problems.size}):\n  - " + problems.joinToString("\n  - ") +
-                    "\n  hint: preload/su_daemon come from the layer repo's `build/pack.sh`, ksud from the " +
-                    "KernelSU repo's `build/build-kernelsu.sh`, ksud-next from the KernelSU-Next workspace " +
-                    "`KernelSU-Next-snothin/out/`; strip after staging with build/scripts/strip-assets.ps1.",
+                "verifyPayloads failed (${problems.size} issues):\n  - " + problems.joinToString("\n  - ") +
+                    "\n  hint: preload/su_daemon come from the chain build/pack.sh; ksud from the KernelSU repo (build-kernelsu.sh)," +
+                    "ksud-next from the KernelSU-Next workspace (KernelSU-Next-snothin/out/)," +
+                    "strip the assets after staging.",
             )
         }
         logger.lifecycle(
-            "==> payload check passed: ${series.size} series (${series.joinToString { it.first }}), " +
-                "${expected.size} artifacts (incl. shared ksud)",
+            "==> payload check passed: ${series.size} series (${series.joinToString { it.first }})," +
+                " ${expected.size} roles (incl. the shared ksud)",
         )
     }
 }
@@ -256,8 +229,12 @@ val bumpVersionCode by tasks.registering {
     }
 }
 
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(bumpVersionCode)
+}
+
 tasks.matching { it.name == "preBuild" }.configureEach {
-    dependsOn(bumpVersionCode, verifyPayloads)
+    dependsOn(verifyPayloads)
 }
 
 dependencies {
@@ -286,6 +263,9 @@ dependencies {
     implementation(libs.miuix.icons)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.blur)
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

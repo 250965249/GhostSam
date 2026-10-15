@@ -75,9 +75,7 @@ import com.snothin.ghostsam.data.prefs.KsudVariant
 import com.snothin.ghostsam.data.prefs.PayloadProfile
 import com.snothin.ghostsam.data.prefs.PayloadProfileKind
 import com.snothin.ghostsam.data.prefs.PayloadProfileStore
-import com.snothin.ghostsam.data.prefs.PersistPrefs
 import com.snothin.ghostsam.data.prefs.SettingsPrefs
-import com.snothin.ghostsam.system.CompanionClient
 import com.snothin.ghostsam.data.channel.ShizukuController
 import com.snothin.ghostsam.ui.component.rememberShizukuConnection
 import com.snothin.ghostsam.ui.navigation3.LocalNavigator
@@ -162,10 +160,6 @@ private fun HomeMiuix(
     }
     val exploitPhase by exploitPhaseFlow.collectAsState(exploitViewModel.uiState.value.phase)
     val exploiting = exploitPhase.isRunning
-    val persistRunFlow = remember(exploitViewModel) {
-        exploitViewModel.uiState.map { it.persistRun }.distinctUntilChanged()
-    }
-    val persistRun by persistRunFlow.collectAsState(exploitViewModel.uiState.value.persistRun)
 
     var payloadEnabled by remember { mutableStateOf(SettingsPrefs.localPayload(context)) }
     LaunchedEffect(Unit) {
@@ -191,19 +185,11 @@ private fun HomeMiuix(
     var profiles by remember { mutableStateOf<List<PayloadProfile>>(emptyList()) }
     var showPayloadPicker by remember { mutableStateOf(false) }
     val ksudUpgrade = rememberKsudUpgradeState(evidence)
-    var companionState by remember { mutableStateOf(CompanionClient.state(context)) }
-    var persistHost by remember { mutableStateOf(PersistPrefs.host(context)) }
-    LaunchedEffect(exploitPhase) {
-        if (exploitPhase == ExploitPhase.Succeeded || exploitPhase == ExploitPhase.Failed) {
-            persistHost = PersistPrefs.host(context)
-        }
-    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                companionState = CompanionClient.state(context)
-                persistHost = PersistPrefs.host(context)
                 scope.launch {
                     profiles = withContext(Dispatchers.IO) { PayloadProfileStore(context).load() }
                     evidence.refreshManager()
@@ -237,18 +223,7 @@ private fun HomeMiuix(
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     }
 
-    // Persist (companion, DFR form): ready = DFR scheme + companion installed; tapping before
-    // activation drives the chain (no wireless debugging); active keeps "open Manager".
-    val persistReady = payloadScheme == PayloadScheme.Dfr && companionState.installed
     val standaloneReady = payloadScheme == PayloadScheme.DfrStandalone && !ksuActive
-
-    val persistHostLine = if (persistReady) {
-        persistHost?.let {
-            resources.getString(R.string.persist_host_line, it.proc, it.pid, it.starts)
-        } ?: resources.getString(R.string.persist_host_pending)
-    } else {
-        null
-    }
 
     val pairPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -326,10 +301,7 @@ private fun HomeMiuix(
     }
 
     fun onStatusCardClick() {
-    if (persistReady && !ksuActive) {
-        navigator.push(Route.Exploit)
-        exploitViewModel.startPersist()
-    } else if (standaloneReady && !managerInstalled) {
+    if (standaloneReady && !managerInstalled) {
         // Standalone fail-closed precheck: without the KernelSU Manager, only hint installation.
     } else if (standaloneReady) {
         if (payloadEnabled) {
@@ -366,7 +338,7 @@ private fun HomeMiuix(
             }
         }
         else -> {
-            if (!persistReady) connectChannel()
+            connectChannel()
         }
     }
     }
@@ -397,7 +369,6 @@ private fun HomeMiuix(
             val status = when {
                 ksuActive -> SummonStatus.Ready
                 exploiting -> SummonStatus.Working
-                persistReady -> SummonStatus.Persisted
                 standaloneReady && !managerInstalled -> SummonStatus.ManagerMissing
                 standaloneReady -> SummonStatus.Standalone
                 channelConnected && !noksuSession && !managerInstalled -> SummonStatus.ManagerMissing
@@ -425,12 +396,6 @@ private fun HomeMiuix(
                     } else {
                         null
                     },
-                    workingDetailOverride = if (persistRun && exploiting) {
-                        context.getString(R.string.home_status_working_detail_persist)
-                    } else {
-                        null
-                    },
-                    persistHostLine = persistHostLine,
                     standaloneRoute = payloadScheme == PayloadScheme.DfrStandalone,
                     nextVariant = nextVariant,
                     onClick = { onStatusCardClick() },

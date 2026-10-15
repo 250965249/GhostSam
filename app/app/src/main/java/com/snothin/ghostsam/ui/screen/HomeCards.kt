@@ -68,7 +68,6 @@ import top.yukonga.miuix.kmp.utils.PressFeedbackType
 enum class SummonStatus {
     Ready,
     Working,
-    Persisted,
     Standalone,
     ManagerMissing,
     SuDenied,
@@ -95,7 +94,6 @@ private fun summonStatusUi(
     isDark: Boolean,
     disconnectedDetailRes: Int,
     disconnectedDetailOverride: String?,
-    workingDetailOverride: String?,
 ): SummonStatusUi = when (status) {
     SummonStatus.Ready -> SummonStatusUi(
         R.string.home_status_ksu_enabled,
@@ -115,15 +113,6 @@ private fun summonStatusUi(
             MiuixTheme.colorScheme.onPrimaryContainer,
         ),
         MiuixTheme.colorScheme.primary.copy(alpha = 0.8f),
-        detailOverride = workingDetailOverride,
-    )
-
-    SummonStatus.Persisted -> SummonStatusUi(
-        R.string.home_status_persist,
-        R.string.home_status_persist_detail,
-        Icons.Rounded.AdminPanelSettings,
-        StatusColors.success(isDark),
-        SuccessAccent,
     )
 
     SummonStatus.Standalone -> SummonStatusUi(
@@ -266,8 +255,6 @@ internal fun SummonStatusCard(
     channelConnected: Boolean,
     disconnectedDetailRes: Int,
     disconnectedDetailOverride: String? = null,
-    workingDetailOverride: String? = null,
-    persistHostLine: String? = null,
     standaloneRoute: Boolean = false,
     nextVariant: Boolean = false,
     onClick: () -> Unit,
@@ -296,7 +283,6 @@ internal fun SummonStatusCard(
         }
         else -> summonStatusUi(
             status, isDark, disconnectedDetailRes, disconnectedDetailOverride,
-            workingDetailOverride,
         )
     }
 
@@ -360,31 +346,6 @@ internal fun SummonStatusCard(
                         fontWeight = FontWeight.Medium,
                         color = ui.colors.content.copy(alpha = 0.8f),
                     )
-                }
-            } else if (status == SummonStatus.Persisted && persistHostLine != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp, 10.dp),
-                    contentAlignment = Alignment.BottomStart,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.AdminPanelSettings,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                            tint = ui.colors.content.copy(alpha = 0.8f),
-                        )
-                        Text(
-                            text = persistHostLine,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = ui.colors.content.copy(alpha = 0.8f),
-                        )
-                    }
                 }
             } else if (standaloneRoute || status == SummonStatus.Standalone) {
                 if (nextVariant) {

@@ -251,7 +251,7 @@ private fun BuildTypeBadge() {
 }
 
 private const val CREDIT_AUTHOR = "nothin"
-private const val CREDIT_DATE = "2026.10.02"
+private const val CREDIT_DATE = "2026.10.14"
 private const val KERNEL_SU_URL = "https://github.com/tiann/KernelSU"
 private const val KERNEL_SU_NEXT_URL = "https://github.com/KernelSU-Next/KernelSU-Next"
 private const val GHOSTLOCK_S26_URL = "https://github.com/snothin/ghostlock-s26"

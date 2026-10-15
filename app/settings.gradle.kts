@@ -18,4 +18,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "GhostSam"
 include(":app")
-include(":companion")

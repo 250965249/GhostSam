@@ -39,14 +39,6 @@ object Contract {
 
     const val DFR_STATUS = "$DFR_DIR/dfr-payload.status"
 
-    /** Exec-disguise magic `@exec-disguise <src> [args...]`: the daemon binds src over /system/bin/logcat
-     *  in a private mount ns (DEFEX checks the path only; a direct exec from /data is killed). */
-    const val EXEC_DISGUISE = "@exec-disguise"
-
-    /** dfr_lkm.ko staged in /dev (root reads of /data are DEFEX-blocked); /dev is wiped on reboot,
-     *  so it stays out of STALE_FILES. */
-    const val DFR_LKM_DEV = "/dev/.dfr-lkm.ko"
-
     const val ENV_NO_KSU = "GHOSTSAM_NO_KSU"
 
     const val LEGACY_ENV_NO_KSU = "GHOSTLOCK_NO_KSU"
