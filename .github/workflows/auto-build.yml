@@ -79,7 +79,7 @@ jobs:
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n1)"
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"
+          "$SDKMANAGER" --install "platforms;android-37" "build-tools;37.0.0" "ndk;30.0.16248370" --channel=3
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
       - name: Write signing config
@@ -102,9 +102,6 @@ jobs:
         run: |
           set -e
           cd app
-          # The hosted runner does not expose the Android 37 preview package.
-          # GhostSam targets API 36; compile against the stable Android 36 SDK in CI.
-          sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
           sed -i 's/ndkVersion = "30.0.15729638"/ndkVersion = "30.0.16248370"/' app/build.gradle.kts
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
