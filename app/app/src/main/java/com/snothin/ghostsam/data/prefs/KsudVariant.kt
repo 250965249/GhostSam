@@ -5,12 +5,14 @@ package com.snothin.ghostsam.data.prefs
  *  at a single point (SettingsPrefs.effectiveKsudVariant). Key: ksud_variant. */
 enum class KsudVariant {
     Default,
-    Next;
+    Next,
+    SukiSU;
 
     val label: String
         get() = when (this) {
             Default -> "KernelSU"
             Next -> "KernelSU-Next"
+            SukiSU -> "SukiSU-Ultra"
         }
 
     companion object {

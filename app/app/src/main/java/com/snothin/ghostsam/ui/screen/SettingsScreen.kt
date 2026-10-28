@@ -412,6 +412,7 @@ private fun LazyListScope.SchemeBlock(
                 items = listOf(
                     stringResource(R.string.settings_ksud_variant_default),
                     stringResource(R.string.settings_ksud_variant_next),
+                    stringResource(R.string.settings_ksud_variant_sukisu),
                 ),
                 startAction = {
                     Icon(
