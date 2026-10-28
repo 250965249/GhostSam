@@ -30,8 +30,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add upstream https://github.com/snothin/GhostSam.git
           git fetch upstream main
-          git merge --no-edit upstream/main
-          git push origin HEAD:bakasu
+          if git merge --no-edit upstream/main; then
+            git push origin HEAD:bakasu
+          else
+            git merge --abort
+            echo "::warning::GhostSam upstream merge has conflicts; building the current bakasu branch instead."
+          fi
 
   build:
     needs: sync
