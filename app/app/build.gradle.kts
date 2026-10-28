@@ -1,6 +1,9 @@
 @file:Suppress("UnstableApiUsage")
 
 import java.util.Properties
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
@@ -26,6 +29,9 @@ fun readVersionProps(): Properties {
 fun currentVersionCode(): Int = readVersionProps().getProperty("versionCode")?.toIntOrNull() ?: 1
 fun currentVersionName(): String = readVersionProps().getProperty("versionName") ?: "0.0.1"
 
+fun currentBuildTime(): String =
+    SimpleDateFormat("yyyy.MM.dd HH:mm", Locale.US).format(Date())
+
 val keystoreProps = Properties().apply {
     val f = rootProject.file("keystore.properties")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -42,6 +48,7 @@ android {
         targetSdk = 36
         versionCode = currentVersionCode()
         versionName = currentVersionName()
+        buildConfigField("String", "BUILD_TIME", "\"${currentBuildTime()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -173,6 +180,7 @@ val verifyPayloads by tasks.registering {
         require("ksud/ksud-next")
         require("ksud/ksud-sukisu")
         require("ksud/ksud-bakasu")
+        require("ksud/versions.properties")
         listOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu", "ksud/ksud-bakasu").forEach { rel ->
             val f = payloadsDir.resolve(rel)
             if (f.isFile && f.length() >= 4) {

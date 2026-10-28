@@ -47,6 +47,8 @@ import com.snothin.ghostsam.data.device.DeviceSnapshot
 import com.snothin.ghostsam.data.channel.SelinuxState
 import com.snothin.ghostsam.data.device.SeriesMatch
 import com.snothin.ghostsam.data.device.SeriesTable
+import com.snothin.ghostsam.data.prefs.KsudVariant
+import com.snothin.ghostsam.data.prefs.PayloadVersions
 import com.snothin.ghostsam.data.prefs.SettingsPrefs
 import com.snothin.ghostsam.ui.theme.KsudCardBlue
 import com.snothin.ghostsam.ui.theme.NatsumeGray
@@ -89,6 +91,12 @@ private fun ksuManagerLabel(): String =
     SettingsPrefs.effectiveKsudVariant(LocalContext.current).label
 
 @Composable
+private fun ksudPayloadVersionLabel(): String {
+    val context = LocalContext.current
+    return PayloadVersions.label(context, SettingsPrefs.effectiveKsudVariant(context))
+}
+
+@Composable
 private fun summonStatusUi(
     status: SummonStatus,
     isDark: Boolean,
@@ -102,6 +110,10 @@ private fun summonStatusUi(
         StatusColors.success(isDark),
         SuccessAccent,
         titleOverride = stringResource(R.string.home_status_ksu_enabled, ksuManagerLabel()),
+        detailOverride = stringResource(
+            R.string.home_status_ksu_enabled_detail_version,
+            ksudPayloadVersionLabel(),
+        ),
     )
 
     SummonStatus.Working -> SummonStatusUi(

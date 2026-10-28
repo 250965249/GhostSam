@@ -64,6 +64,7 @@ import com.snothin.ghostsam.data.exploit.PayloadScheme
 import com.snothin.ghostsam.data.exploit.RunState
 import com.snothin.ghostsam.data.exploit.StandaloneDfr
 import com.snothin.ghostsam.data.prefs.KsudVariant
+import com.snothin.ghostsam.data.prefs.PayloadVersions
 import com.snothin.ghostsam.data.prefs.SettingsPrefs
 import com.snothin.ghostsam.ui.component.NumberInputDialog
 import com.snothin.ghostsam.ui.component.SectionLabel
@@ -410,10 +411,14 @@ private fun LazyListScope.SchemeBlock(
                     },
                 ),
                 items = listOf(
-                    stringResource(R.string.settings_ksud_variant_default),
-                    stringResource(R.string.settings_ksud_variant_next),
-                    stringResource(R.string.settings_ksud_variant_sukisu),
-                    stringResource(R.string.settings_ksud_variant_bakasu),
+                    stringResource(R.string.settings_ksud_variant_default) + " · " +
+                        PayloadVersions.label(context, KsudVariant.Default),
+                    stringResource(R.string.settings_ksud_variant_next) + " · " +
+                        PayloadVersions.label(context, KsudVariant.Next),
+                    stringResource(R.string.settings_ksud_variant_sukisu) + " · " +
+                        PayloadVersions.label(context, KsudVariant.SukiSU),
+                    stringResource(R.string.settings_ksud_variant_bakasu) + " · " +
+                        PayloadVersions.label(context, KsudVariant.BakaSU),
                 ),
                 startAction = {
                     Icon(
@@ -443,6 +448,15 @@ private fun LazyListScope.SchemeBlock(
                     }
                 },
                 enabled = standaloneRoute && !state.kernelActivated,
+            )
+            Text(
+                text = stringResource(
+                    R.string.settings_ksud_payload_version,
+                    PayloadVersions.label(context, state.ksudVariant),
+                ),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                fontSize = 12.sp,
+                color = MiuixTheme.colorScheme.onBackgroundVariant,
             )
             if (state.payloadScheme != PayloadScheme.Default) {
                 if (state.pinStatus.isNotEmpty()) {

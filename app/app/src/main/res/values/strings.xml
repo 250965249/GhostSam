@@ -15,6 +15,7 @@
     <string name="home_status_su_denied_detail">Open the manager to grant su (for SELinux toggle, system tools)</string>
     <string name="home_status_ksu_enabled">%1$s enabled</string>
     <string name="home_status_ksu_enabled_detail">Tap to open manager</string>
+    <string name="home_status_ksu_enabled_detail_version">Tap to open manager · %1$s</string>
     <string name="home_status_noksu_enabled">Temporary root channel</string>
     <string name="home_status_noksu_enabled_detail">KernelSU not loaded · socket channel active until reboot</string>
     <string name="home_status_standalone">Ready</string>
@@ -31,6 +32,8 @@
     <string name="home_status_disconnected_detail_adb">Wireless debugging not connected</string>
     <string name="home_status_disconnected_detail_shizuku">Shizuku not connected</string>
     <string name="home_version_format">v%1$s (%2$d)</string>
+    <string name="home_build_version_format">v%1$s · %2$s</string>
+    <string name="home_build_real_label">RealB6o</string>
     <string name="device_model">Device model</string>
     <string name="device_codename">Device codename</string>
     <string name="device_series">Device series</string>
@@ -167,6 +170,7 @@
     <string name="settings_ksud_variant_summary">Takes effect on the next run, reboot to replace the kernel</string>
     <string name="settings_ksud_variant_locked">Switchable only on DirtyFrag (standalone)</string>
     <string name="settings_ksud_variant_active">Root active · reboot to switch</string>
+    <string name="settings_ksud_payload_version">Current payload: %1$s</string>
     <string name="settings_pin_probe">Page-cache write check</string>
     <string name="settings_pin_probe_summary">Checks whether page-cache writes still work on this device; runs are blocked when unsupported (few ms)</string>
     <string name="settings_pin_probe_running">Checking…</string>
@@ -232,6 +236,10 @@
     <string name="about_ksu_description">A kernel-based root solution for Android</string>
     <string name="about_ksunext_title">KernelSU-Next</string>
     <string name="about_ksunext_description">An advanced Kernel based root solution for Android</string>
+    <string name="about_sukisu_title">SukiSU-Ultra</string>
+    <string name="about_sukisu_description">SukiSU-Ultra open-source project</string>
+    <string name="about_bakasu_title">BakaSU</string>
+    <string name="about_bakasu_description">BakaSU open-source project</string>
     <string name="about_s26_title">Ghostlock S26</string>
     <string name="about_s26_description">Ghostlock S26 exploit repository</string>
     <string name="about_app_title">GhostSam</string>

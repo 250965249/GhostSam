@@ -15,6 +15,7 @@
     <string name="home_status_su_denied_detail">打开管理器授权（用于 SELinux 切换、系统工具）</string>
     <string name="home_status_ksu_enabled">%1$s 已启用</string>
     <string name="home_status_ksu_enabled_detail">点击打开管理器</string>
+    <string name="home_status_ksu_enabled_detail_version">点击打开管理器 · %1$s</string>
     <string name="home_status_noksu_enabled">临时 root 通道</string>
     <string name="home_status_noksu_enabled_detail">KernelSU 未加载 · socket 通道生效至重启</string>
     <string name="home_status_standalone">就绪</string>
@@ -31,6 +32,8 @@
     <string name="home_status_disconnected_detail_adb">无线调试未连接</string>
     <string name="home_status_disconnected_detail_shizuku">Shizuku 未连接</string>
     <string name="home_version_format">v%1$s（%2$d）</string>
+    <string name="home_build_version_format">v%1$s · %2$s</string>
+    <string name="home_build_real_label">RealB6o</string>
     <string name="device_model">设备型号</string>
     <string name="device_codename">设备代号</string>
     <string name="device_series">设备系列</string>
@@ -166,6 +169,7 @@
     <string name="settings_ksud_variant_summary">下次执行生效，更换内核需重启</string>
     <string name="settings_ksud_variant_locked">仅支持 DirtyFrag（独立）切换</string>
     <string name="settings_ksud_variant_active">已获取 root，重启后可切换</string>
+    <string name="settings_ksud_payload_version">当前 Payload：%1$s</string>
     <string name="settings_pin_probe">页缓存写入检查</string>
     <string name="settings_pin_probe_summary">检查本机是否仍支持页缓存写入，不支持时阻止运行（毫秒级）</string>
     <string name="settings_pin_probe_running">正在检查…</string>
@@ -232,6 +236,10 @@
     <string name="about_ksu_description">Android 内核级 root 方案</string>
     <string name="about_ksunext_title">KernelSU-Next</string>
     <string name="about_ksunext_description">An advanced Kernel based root solution for Android</string>
+    <string name="about_sukisu_title">SukiSU-Ultra</string>
+    <string name="about_sukisu_description">SukiSU-Ultra 开源项目</string>
+    <string name="about_bakasu_title">BakaSU</string>
+    <string name="about_bakasu_description">BakaSU 开源项目</string>
     <string name="about_s26_title">Ghostlock S26</string>
     <string name="about_s26_description">Ghostlock S26 exploit 仓库</string>
     <string name="about_app_title">GhostSam</string>

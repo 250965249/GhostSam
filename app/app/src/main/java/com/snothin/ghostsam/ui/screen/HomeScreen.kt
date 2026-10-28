@@ -61,6 +61,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.snothin.ghostsam.R
+import com.snothin.ghostsam.BuildConfig
 import com.snothin.ghostsam.data.channel.AdbController
 import com.snothin.ghostsam.data.channel.AdbPairService
 import com.snothin.ghostsam.data.device.DeviceMatcher
@@ -352,6 +353,25 @@ private fun HomeMiuix(
                 title = stringResource(R.string.app_name),
                 largeTitle = stringResource(R.string.app_name),
                 scrollBehavior = scrollBehavior,
+                actions = {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = stringResource(
+                                R.string.home_build_version_format,
+                                BuildConfig.VERSION_NAME,
+                                BuildConfig.BUILD_TIME,
+                            ),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onBackgroundVariant,
+                        )
+                        Text(
+                            text = stringResource(R.string.home_build_real_label),
+                            fontSize = 9.sp,
+                            color = MiuixTheme.colorScheme.onBackgroundVariant.copy(alpha = 0.65f),
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
