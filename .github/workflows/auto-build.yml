@@ -1,0 +1,116 @@
+name: Auto Build GhostSam
+
+# Daily: sync GhostSam upstream, fetch the latest four ksud payloads, build and sign GhostSam.
+# Requires repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD.
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 05:00 Asia/Shanghai
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ghostsam-auto-build
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: bakasu
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge upstream GhostSam main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/snothin/GhostSam.git
+          git fetch upstream main
+          git merge --no-edit upstream/main
+          git push origin HEAD:bakasu
+
+  build:
+    needs: sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: bakasu
+          fetch-depth: 0
+
+      - name: Fetch latest ksud payloads
+        run: |
+          set -e
+          mkdir -p app/app/src/main/assets/payloads/ksud
+          base="app/app/src/main/assets/payloads/ksud"
+          curl -fL --retry 3 -o "$base/ksud" \
+            https://github.com/tiann/KernelSU/releases/latest/download/ksud-aarch64-linux-android
+          curl -fL --retry 3 -o "$base/ksud-next" \
+            https://github.com/250965249/KernelSU-Next-Samsung/releases/download/latest-ksud/ksud-next-aarch64
+          curl -fL --retry 3 -o "$base/ksud-sukisu" \
+            https://github.com/250965249/SukiSU-Ultra/releases/download/latest-ksud/ksud-sukisu-aarch64
+          curl -fL --retry 3 -o "$base/ksud-bakasu" \
+            https://github.com/250965249/BakaSU/releases/download/latest-ksud/ksud-bakasu-aarch64
+          for f in ksud ksud-next ksud-sukisu ksud-bakasu; do
+            test -s "$base/$f"
+            file "$base/$f"
+            head -c4 "$base/$f" | od -An -tx1 | grep -q '7f 45 4c 46'
+          done
+          sha256sum "$base"/*
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android 37 / NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-37" "build-tools;37.0.0" "ndk;30.0.16248370"
+
+      - name: Write signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          echo "$KEYSTORE_BASE64" | base64 -d > app/ghostsam-ci.jks
+          cat > app/keystore.properties <<EOF
+          storeFile=ghostsam-ci.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build release APK
+        run: |
+          set -e
+          cd app
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          test -f app/build/outputs/apk/release/app-release.apk
+
+      - name: Publish latest-auto release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          apk="app/app/build/outputs/apk/release/app-release.apk"
+          out="GhostSam_auto_$(date -u +%Y%m%d).apk"
+          cp "$apk" "$out"
+          sha256sum "$out" > "$out.sha256"
+          if ! gh release view latest-auto >/dev/null 2>&1; then
+            gh release create latest-auto --title "GhostSam auto build" \
+              --notes "Automatically synced upstream GhostSam + latest KernelSU / KernelSU-Next / SukiSU / BakaSU ksud payloads."
+          fi
+          gh release upload latest-auto "$out" "$out.sha256" --clobber
