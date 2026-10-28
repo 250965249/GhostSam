@@ -162,8 +162,8 @@
     <string name="settings_scheme_standalone">DirtyFrag</string>
     <string name="settings_scheme_default_notice">三星26.10月补丁已经修复，如设备未修复，可自行尝试或者调整更多设置中的偏移量</string>
     <string name="settings_ksud_variant">KernelSU 版本</string>
-    <string name="settings_ksud_variant_default">KernelSU（3.3.1 · 32680）</string>
-    <string name="settings_ksud_variant_next">KernelSU-Next（3.4.2 · 33355）</string>
+    <string name="settings_ksud_variant_default">KernelSU</string>
+    <string name="settings_ksud_variant_next">KernelSU-Next</string>
     <string name="settings_ksud_variant_sukisu">SukiSU-Ultra</string>
     <string name="settings_ksud_variant_bakasu">BakaSU</string>
     <string name="settings_ksud_variant_summary">下次执行生效，更换内核需重启</string>

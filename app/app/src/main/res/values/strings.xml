@@ -163,8 +163,8 @@
     <string name="settings_scheme_standalone">DirtyFrag</string>
     <string name="settings_scheme_default_notice">This scheme was fixed in the Samsung October 2026 patch; if your device is unpatched, you can try it, or adjust the offsets in More settings</string>
     <string name="settings_ksud_variant">KernelSU version</string>
-    <string name="settings_ksud_variant_default">KernelSU (3.3.1 · 32680)</string>
-    <string name="settings_ksud_variant_next">KernelSU-Next (3.4.2 · 33355)</string>
+    <string name="settings_ksud_variant_default">KernelSU</string>
+    <string name="settings_ksud_variant_next">KernelSU-Next</string>
     <string name="settings_ksud_variant_sukisu">SukiSU-Ultra</string>
     <string name="settings_ksud_variant_bakasu">BakaSU</string>
     <string name="settings_ksud_variant_summary">Takes effect on the next run, reboot to replace the kernel</string>
