@@ -23,6 +23,8 @@ object KernelSuProbe {
 
     private const val PACKAGE_SUKISU = "com.sukisu.ultra"
 
+    private const val PACKAGE_BAKASU = "com.resukisu.resukisu"
+
     /** KernelSU-Next manager signing-cert SHA-256 (= kernel Kbuild KSU_NEXT_MANAGER_HASH): normal and
      *  -spoofed share the cert while spoofed names are random - the cert is the only stable identifier. */
     private const val KSU_NEXT_MANAGER_CERT_SHA256 =
@@ -32,11 +34,18 @@ object KernelSuProbe {
     private const val SUKISU_MANAGER_CERT_SHA256 =
         "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef"
 
+    /** BakaSU manager signing-cert SHA-256 (GhostSam test key used for the bundled manager). */
+    private const val BAKASU_MANAGER_CERT_SHA256 =
+        "8113db5e7d0b0de1a4635236a477083c85aeb94088595eee4c89705cf4cdab23"
+
     @Volatile
     private var ksuNextCertPackages: List<String> = emptyList()
 
     @Volatile
     private var sukisuCertPackages: List<String> = emptyList()
+
+    @Volatile
+    private var bakasuCertPackages: List<String> = emptyList()
 
     @Volatile
     private var certScanAt = 0L
@@ -56,6 +65,7 @@ object KernelSuProbe {
     private const val CACHE_PREFS = "ksu_manager_cache"
     private const val KEY_PACKAGES_NEXT = "packages_next"
     private const val KEY_PACKAGES_SUKISU = "packages_sukisu"
+    private const val KEY_PACKAGES_BAKASU = "packages_bakasu"
     private const val LOG_TAG = "GhostSam"
 
     private fun loadCache(context: Context) {
@@ -77,6 +87,13 @@ object KernelSuProbe {
                         .sortedBy { if (it == PACKAGE_SUKISU) 0 else 1 }
                 }
             }
+            prefs.getString(KEY_PACKAGES_BAKASU, null)?.let { raw ->
+                val cached = raw.split(',').filter { it.isNotBlank() }
+                if (cached.isNotEmpty()) {
+                    bakasuCertPackages = (cached + bakasuCertPackages).distinct()
+                        .sortedBy { if (it == PACKAGE_BAKASU) 0 else 1 }
+                }
+            }
         }
     }
 
@@ -85,6 +102,7 @@ object KernelSuProbe {
             context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
                 .putString(KEY_PACKAGES_NEXT, ksuNextCertPackages.joinToString(","))
                 .putString(KEY_PACKAGES_SUKISU, sukisuCertPackages.joinToString(","))
+                .putString(KEY_PACKAGES_BAKASU, bakasuCertPackages.joinToString(","))
                 .apply()
         }
     }
@@ -93,17 +111,20 @@ object KernelSuProbe {
         KsudVariant.Default -> PACKAGE_KERNELSU
         KsudVariant.Next -> PACKAGE_KERNELSU_NEXT
         KsudVariant.SukiSU -> PACKAGE_SUKISU
+        KsudVariant.BakaSU -> PACKAGE_BAKASU
     }
 
     private fun certHash(variant: KsudVariant): String? = when (variant) {
         KsudVariant.Next -> KSU_NEXT_MANAGER_CERT_SHA256
         KsudVariant.SukiSU -> SUKISU_MANAGER_CERT_SHA256
+        KsudVariant.BakaSU -> BAKASU_MANAGER_CERT_SHA256
         KsudVariant.Default -> null
     }
 
     private fun currentPackages(variant: KsudVariant): List<String> = when (variant) {
         KsudVariant.Next -> ksuNextCertPackages
         KsudVariant.SukiSU -> sukisuCertPackages
+        KsudVariant.BakaSU -> bakasuCertPackages
         KsudVariant.Default -> emptyList()
     }
 
@@ -111,6 +132,7 @@ object KernelSuProbe {
         when (variant) {
             KsudVariant.Next -> ksuNextCertPackages = packages
             KsudVariant.SukiSU -> sukisuCertPackages = packages
+            KsudVariant.BakaSU -> bakasuCertPackages = packages
             KsudVariant.Default -> Unit
         }
     }
@@ -206,6 +228,9 @@ object KernelSuProbe {
             KsudVariant.SukiSU ->
                 if (PACKAGE_SUKISU in sukisuCertPackages) sukisuCertPackages
                 else sukisuCertPackages + PACKAGE_SUKISU
+            KsudVariant.BakaSU ->
+                if (PACKAGE_BAKASU in bakasuCertPackages) bakasuCertPackages
+                else bakasuCertPackages + PACKAGE_BAKASU
         }
     }
 

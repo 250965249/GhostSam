@@ -6,13 +6,15 @@ package com.snothin.ghostsam.data.prefs
 enum class KsudVariant {
     Default,
     Next,
-    SukiSU;
+    SukiSU,
+    BakaSU;
 
     val label: String
         get() = when (this) {
             Default -> "KernelSU"
             Next -> "KernelSU-Next"
             SukiSU -> "SukiSU-Ultra"
+            BakaSU -> "BakaSU"
         }
 
     companion object {
