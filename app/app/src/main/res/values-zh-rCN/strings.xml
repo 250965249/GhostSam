@@ -161,8 +161,8 @@
     <string name="settings_ksud_variant">KernelSU 版本</string>
     <string name="settings_ksud_variant_default">KernelSU（3.3.1 · 32680）</string>
     <string name="settings_ksud_variant_next">KernelSU-Next（3.4.2 · 33355）</string>
-    <string name="settings_ksud_variant_sukisu">SukiSU-Ultra（4.2.1 · 41068）</string>
-    <string name="settings_ksud_variant_bakasu">BakaSU（4.2.0-rc3）</string>
+    <string name="settings_ksud_variant_sukisu">SukiSU-Ultra</string>
+    <string name="settings_ksud_variant_bakasu">BakaSU</string>
     <string name="settings_ksud_variant_summary">下次执行生效，更换内核需重启</string>
     <string name="settings_ksud_variant_locked">仅支持 DirtyFrag（独立）切换</string>
     <string name="settings_ksud_variant_active">已获取 root，重启后可切换</string>

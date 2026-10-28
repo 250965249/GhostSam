@@ -162,8 +162,8 @@
     <string name="settings_ksud_variant">KernelSU version</string>
     <string name="settings_ksud_variant_default">KernelSU (3.3.1 · 32680)</string>
     <string name="settings_ksud_variant_next">KernelSU-Next (3.4.2 · 33355)</string>
-    <string name="settings_ksud_variant_sukisu">SukiSU-Ultra (4.2.1 · 41068)</string>
-    <string name="settings_ksud_variant_bakasu">BakaSU (4.2.0-rc3)</string>
+    <string name="settings_ksud_variant_sukisu">SukiSU-Ultra</string>
+    <string name="settings_ksud_variant_bakasu">BakaSU</string>
     <string name="settings_ksud_variant_summary">Takes effect on the next run, reboot to replace the kernel</string>
     <string name="settings_ksud_variant_locked">Switchable only on DirtyFrag (standalone)</string>
     <string name="settings_ksud_variant_active">Root active · reboot to switch</string>
