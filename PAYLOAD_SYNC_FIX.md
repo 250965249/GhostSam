@@ -224,3 +224,104 @@ sidecar、auto-sync 链路上不能有缺 `ref:` 的 checkout、`ksud.yml` 的 t
 - `payloads.lock.json` 会随 APK 一起打进 `assets/`，里面含各变体的
   `sha256` / `built_at` / `upstream_commit`，可用于排障；
   将来若要加"包内版本过期提示"，读它即可。
+
+---
+
+## 七、2026-11-01 落地实录（追加）
+
+真正跑起来之后又发现三件事，都已修掉或定位：
+
+### 7.1 `latest-auto` 已出新包
+
+`GhostSam_auto_20261101.apk`，25,041,424 bytes
+
+```
+sha256 ae3a8948b3e348d33422acdd2ca8b20d6deb29d3d5298496df738b528dc884e2
+```
+
+包内实测（不是看清单，是把 APK 里的二进制抠出来读版本戳）：
+
+| 变体 | `VERSION_CODE` | `VERSION_NAME` | 说明 |
+|---|---|---|---|
+| `ksud`（官方） | 32680 | `3.3.1` | 每次构建现拉 tiann 最新 release |
+| `ksud-next` | 33355 | `3.4.2` | **今天重新编译**，`sha256 8cf2d20a…` |
+| `ksud-sukisu` | 41108 | `latest-ksud-2-g5708694a` | 仍停在 10-29 的产物，见 7.3 |
+| `ksud-bakasu` | 35260 | `latest-ksud-1-gb8f9d24f` | 同上 |
+
+包内 `assets/payloads/ksud/versions.properties`：
+
+```properties
+default=KernelSU v3.3.1 (32680)
+next=KernelSU-Next v3.4.2 (33355, pinned)
+sukisu=SukiSU-Ultra (41108)
+bakasu=BakaSU (35260)
+```
+
+即：**设置页会显示 `SukiSU-Ultra (41108)`，不再是那个和任何真实构建都对不上的 41098。**
+
+### 7.2 缺陷 4：KernelSU-Next 的版本是**写死的**
+
+`ksunext-samsung-user/userspace/ksud/build.rs`：
+
+```rust
+let (code, name) = match get_git_version() {
+    Ok((_code, _name)) => (33355, "3.4.2".to_string()), // PATCH(ghostsam): version pin
+    Err(_) => (33355, "3.4.2".to_string()),             // PATCH(ghostsam): version pin
+};
+```
+
+git 算出来的值被直接丢弃，**不管树走多远，永远报 33355 / 3.4.2**。
+这和"版本不跟着上游变"是同一类问题，只是它连 git 都不看。
+
+处理：producer 的 release 校验新增 `EXPECTED_STAMP` 环境变量
+（空 = 从 git 推导，非空 = `<code>:<name>` 表示该变体是钉死的），
+sidecar 里写 `version_pinned` 和 `git_version_name`，GhostSam 的标签渲染成
+`KernelSU-Next v3.4.2 (33355, pinned)`——钉死就明说，不让它伪装成实时版本。
+
+> 没有直接删掉这个 pin，是因为该仓库**没有任何 `v*` 版本 tag**
+> （整个仓库只有 `latest-ksud` 一个 tag，实测 `git tag -l | wc -l` = 1），
+> 去掉 pin 后 `git describe` 只能给出裸 sha，标签会退化成
+> `KernelSU-Next (33386)`，可读性反而更差。
+
+### 7.3 缺陷 5：GitHub Actions 在**两个 fork 上被禁用**了
+
+这才是"定时任务从 10-29 起一次都没跑"的真因，不是 cron 丢了：
+
+```
+$ gh workflow run auto-sync-build.yml -R 250965249/SukiSU-Ultra --ref samsung
+could not create workflow dispatch event:
+HTTP 422: Actions has been disabled for this repository.
+```
+
+`250965249/SukiSU-Ultra` 和 `250965249/BakaSU` 是 fork
+（`fork=true`，parent 分别是 `SukiSU-Ultra/SukiSU-Ultra`、`Baka-SU/BakaSU`），
+而 `250965249/KernelSU-Next-Samsung` 和 `250965249/GhostSam` 是独立仓库
+（`fork=false`）——**能跑的两个都不是 fork**。
+
+试过并确认无效：`PUT /repos/{r}/actions/permissions {enabled:true}`（返回 200，
+但 dispatch 仍 422）、`enabled=false→true` 来回切、换另一个 workflow dispatch
+（同样是 422）。这个"fork 是否启用 workflows"的开关不在 REST API 里。
+
+**需要仓库所有者各点一次**（Actions 页面顶部的横幅
+"I understand my workflows, go ahead and enable them"）：
+
+- https://github.com/250965249/SukiSU-Ultra/actions
+- https://github.com/250965249/BakaSU/actions
+
+启用后这两条链会自动恢复：每天 02:00 跑 producer、05:00 跑 GhostSam；
+在此之前 GhostSam 每次都会出包，但**末尾那步会红**，并在 release notes 里写明
+哪个变体没有 sidecar、为什么无法核对同步状态。这是故意的：宁可红，也不要再
+无声地发旧包。
+
+### 7.4 顺带修掉的构建闸门
+
+`app/build.gradle.kts` 里有 `verifyPayloads` 任务，把
+`assets/payloads/ksud/` 当成固定清单，多一个文件就失败：
+
+```
+> verifyPayloads failed (1 issues):
+    - unexpected file: ksud/payloads.lock.json
+```
+
+`payloads.lock.json` 是构建元数据不是 payload，已挪到仓库根目录
+（`gen_payload_versions.py --lock-out payloads.lock.json`）。
