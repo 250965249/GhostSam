@@ -1,9 +1,12 @@
 {
-  "generated_at": "2026-11-01T07:15:41Z",
+  "generated_at": "2026-11-01T08:12:31Z",
   "payloads_dir": "app\\app\\src\\main\\assets\\payloads\\ksud",
   "problems": [
+    "next: no ksud-next.version published by 250965249/KernelSU-Next-Samsung - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified",
     "sukisu: version_name 'latest-ksud' came from a fork release tag and no producer sidecar supplies the real one - the producer's ksud build ran `git describe` with `latest-ksud` present",
-    "bakasu: version_name 'latest-ksud-1-gb8f9d24f' came from a fork release tag and no producer sidecar supplies the real one - the producer's ksud build ran `git describe` with `latest-ksud` present"
+    "sukisu: no ksud-sukisu.version published by 250965249/SukiSU-Ultra - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified",
+    "bakasu: version_name 'latest-ksud-1-gb8f9d24f' came from a fork release tag and no producer sidecar supplies the real one - the producer's ksud build ran `git describe` with `latest-ksud` present",
+    "bakasu: no ksud-bakasu.version published by 250965249/BakaSU - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified"
   ],
   "variants": {
     "bakasu": {
@@ -15,6 +18,7 @@
       "distance": 1,
       "elf_version_name": "latest-ksud-1-gb8f9d24f",
       "file": "ksud-bakasu",
+      "git_version_name": null,
       "label": "BakaSU (35260)",
       "sha256": "1bf67afa6f423d87d2c88ebbf5e4ec4d2c3228ee437de13e2652a3a49c693a50",
       "size": 5928128,
@@ -24,7 +28,8 @@
       "upstream_version_name": null,
       "variant": "bakasu",
       "version_code": 35260,
-      "version_name": "latest-ksud-1-gb8f9d24f"
+      "version_name": "latest-ksud-1-gb8f9d24f",
+      "version_pinned": false
     },
     "default": {
       "behind_upstream": null,
@@ -35,6 +40,7 @@
       "distance": 0,
       "elf_version_name": "3.3.1",
       "file": "ksud",
+      "git_version_name": null,
       "label": "KernelSU v3.3.1 (32680)",
       "sha256": "049491e2b4cc0a6c913d3920cb90b8c94c9e8ca96c0ee92818293304973bfb1b",
       "size": 6402736,
@@ -44,7 +50,8 @@
       "upstream_version_name": null,
       "variant": "default",
       "version_code": 32680,
-      "version_name": "3.3.1"
+      "version_name": "3.3.1",
+      "version_pinned": false
     },
     "next": {
       "behind_upstream": null,
@@ -55,6 +62,7 @@
       "distance": 0,
       "elf_version_name": "3.4.2",
       "file": "ksud-next",
+      "git_version_name": null,
       "label": "KernelSU-Next v3.4.2 (33355)",
       "sha256": "715fb2309989527f43dfbcb5284b62ef2d04478a97a89a9c0091a8b2dd71adea",
       "size": 7108832,
@@ -64,7 +72,8 @@
       "upstream_version_name": null,
       "variant": "next",
       "version_code": 33355,
-      "version_name": "3.4.2"
+      "version_name": "3.4.2",
+      "version_pinned": false
     },
     "sukisu": {
       "behind_upstream": null,
@@ -75,6 +84,7 @@
       "distance": 0,
       "elf_version_name": "latest-ksud",
       "file": "ksud-sukisu",
+      "git_version_name": null,
       "label": "SukiSU-Ultra (41106)",
       "sha256": "f2d04f72ceb0371c7247de37050e4a2ce889cf9654c3cbe4b0521123e77f7ec7",
       "size": 7811984,
@@ -84,12 +94,9 @@
       "upstream_version_name": null,
       "variant": "sukisu",
       "version_code": 41106,
-      "version_name": "latest-ksud"
+      "version_name": "latest-ksud",
+      "version_pinned": false
     }
   },
-  "warnings": [
-    "next: no sidecar at ksud-next.version; version name cannot be verified - update the producer workflow",
-    "sukisu: no sidecar at ksud-sukisu.version; version name cannot be verified - update the producer workflow",
-    "bakasu: no sidecar at ksud-bakasu.version; version name cannot be verified - update the producer workflow"
-  ]
+  "warnings": []
 }

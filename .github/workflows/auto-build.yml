@@ -30,6 +30,9 @@ concurrency:
 env:
   PAYLOAD_DIR: app/app/src/main/assets/payloads/ksud
   SIDECAR_DIR: payloads-sidecars
+  # Outside assets/: app/build.gradle.kts `verifyPayloads` rejects any file in
+  # assets/payloads/ksud that is not one of the fixed PackRole entries.
+  LOCK_FILE: payloads.lock.json
 
 jobs:
   sync:
@@ -136,6 +139,7 @@ jobs:
             --payloads "$PAYLOAD_DIR" \
             --sidecars "$SIDECAR_DIR" \
             --max-age-hours 48 \
+            --lock-out "$LOCK_FILE" \
             --write --allow-problems
 
           # Determinism guard: a second pass must reproduce the same bytes.
@@ -146,10 +150,10 @@ jobs:
 
           echo "--- $PAYLOAD_DIR/versions.properties ---"
           cat "$PAYLOAD_DIR/versions.properties"
-          cat "$PAYLOAD_DIR/payloads.lock.json"
+          cat "$LOCK_FILE"
 
           python3 tools/report_payloads.py \
-            --lock "$PAYLOAD_DIR/payloads.lock.json" \
+            --lock "$LOCK_FILE" \
             --table /tmp/payload-table.md \
             --github-output "$GITHUB_OUTPUT"
 

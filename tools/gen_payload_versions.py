@@ -275,6 +275,14 @@ def main(argv: list[str]) -> int:
         help="directory holding the producer *.version sidecars (default: --payloads)",
     )
     ap.add_argument("--max-age-hours", type=float, default=48.0)
+    ap.add_argument(
+        "--lock-out",
+        type=Path,
+        default=None,
+        help="where to write payloads.lock.json (default: inside --payloads). "
+        "Pass a path outside the assets tree: app/build.gradle.kts verifyPayloads "
+        "rejects any file in assets/payloads/ksud that is not a known role.",
+    )
     ap.add_argument("--json", action="store_true", help="print the full report")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--check", action="store_true")
@@ -307,11 +315,13 @@ def main(argv: list[str]) -> int:
     # Force LF so the committed file is byte-identical whether it was generated
     # on the Linux runner or on a Windows dev box (the repo sets `* -text`, so
     # the bytes land in git unchanged and --check compares them literally).
+    lock_out = args.lock_out or (payloads / LOCK_NAME)
     if args.write:
         (payloads / MANIFEST_NAME).write_text(manifest, encoding="utf-8", newline="\n")
-        (payloads / LOCK_NAME).write_text(lock, encoding="utf-8", newline="\n")
         print(f"wrote {payloads / MANIFEST_NAME}")
-        print(f"wrote {payloads / LOCK_NAME}")
+        lock_out.parent.mkdir(parents=True, exist_ok=True)
+        lock_out.write_text(lock, encoding="utf-8", newline="\n")
+        print(f"wrote {lock_out}")
 
     if args.check:
         current = (payloads / MANIFEST_NAME).read_text(encoding="utf-8").replace("\r\n", "\n")
