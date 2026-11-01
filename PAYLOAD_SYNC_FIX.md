@@ -325,3 +325,63 @@ HTTP 422: Actions has been disabled for this repository.
 
 `payloads.lock.json` 是构建元数据不是 payload，已挪到仓库根目录
 （`gen_payload_versions.py --lock-out payloads.lock.json`）。
+
+---
+
+## 八、最终状态（2026-11-01 17:10 Asia/Shanghai）
+
+两条 fork 的 Actions 启用后，链路一次跑通，`Auto Build GhostSam` 全绿。
+
+**成品**
+
+```
+GhostSam_auto_20261101.apk   25,041,424 bytes
+sha256 988c66116fcb976fa513944142aedfff68ca67ff0a08e7c83de5ac768ac80224
+https://github.com/250965249/GhostSam/releases/tag/latest-auto
+```
+
+包内实测（从 APK 里抠出二进制读版本戳）：
+
+| 变体 | VERSION_CODE | VERSION_NAME | 相对上游 |
+|---|---|---|---|
+| `ksud` | 32680 | `3.3.1` | tiann 官方最新 release |
+| `ksud-next` | 33355 | `3.4.2` | 与 `snothin/KernelSU-Next` 同步（版本被 pin，见 7.2） |
+| `ksud-sukisu` | **41134** | `4.3.0-34-g0912ba85` | 已合入 `4.3.0-20-g0fe8d052`，**0 落后** |
+| `ksud-bakasu` | **35268** | `4.2.0-rc3-97-g466e0dc4` | 已合入 `4.2.0-rc3-86-g516d3e87`，**0 落后** |
+
+设置页现在显示：
+`SukiSU-Ultra v4.3.0+34 (41134)` 和 `BakaSU v4.2.0-rc3+97 (35268)`，
+对比最初那个从来没有对上的 `41098`。
+
+### 8.1 最后两个内核冲突
+
+同步恢复后立刻暴露出两处真实的合并冲突（以前被静默吞掉）：
+
+| 仓库 | 冲突文件 | 冲突内容 |
+|---|---|---|
+| SukiSU | `kernel/hook/arm64/patch_memory.c` | 上游给 `ksu_patch_text()` 加了 `stop_machine()` 失败日志；samsung 把整个函数包进 `CONFIG_KSU_SAMSUNG_NO_PATCH_TEXT`（EL2/RKP 禁止运行时改内核text） |
+| BakaSU | `kernel/core/init.c` | 上游把 symbol resolver 挪到 `prepare_creds()` 之后并新增 `ksu_selinux_inode_init()` + `put_cred()` 清理；samsung 需要 apatch 冲突检查、symbol resolver、`ksu_samsung_kdp_init()` 在 `prepare_creds()` **之前**执行 |
+
+两处都按"保留 samsung 语义 + 采纳上游新逻辑"解决，判据是
+`git diff up/main -- <file>` 的结果**只剩 samsung 自己的增量**：
+
+- `patch_memory.c`：`#ifdef CONFIG_KSU_SAMSUNG_NO_PATCH_TEXT` 早退保留，
+  `#else` 分支改用上游的 `int ret; ret = stop_machine(...); if (ret) pr_err(...)`。
+  `CONFIG_KSU_SAMSUNG_NO_PATCH_TEXT=y` 由 `ddk-lkm.yml` 传入、
+  `kernel/Kbuild` 转成 `-DCONFIG_...=1`，所以三星构建走早退，行为不变。
+- `init.c`：顺序保留 samsung 的（apatch check → symbol resolver → kdp init →
+  prepare_creds → defex init），再插入上游新增的
+  `ret = ksu_selinux_inode_init(); if (ret) { put_cred(...); ... }`，
+  仍在 `ksu_selinux_init()` 之前。
+
+> 这两处只验证到"能编译、逻辑符合同两侧原意"，**没有在真机上验证开机/授权**。
+> 如果刷入后异常，`git revert` 这两个 merge 提交即可回到"落后上 N 个提交但已知可用"的状态。
+
+### 8.2 现在的自动化行为
+
+- 每天 02:00 三个 producer 合并上游 → 编译 8 KMI LKM + ksud → 发布 `ksud-*` 与 `.version`
+  （合并冲突、落后上游都会在出包后把这轮跑红，并写明冲突文件）
+- 每天 05:00 GhostSam 拉取 → 从二进制重建 `versions.properties` →
+  反查 APK 内清单 → 出包 → release notes 带四变体版本表与同步状态
+- 任一变体落后上游 / 缺 sidecar / 版本戳与树不符 / 载荷超过 48h，都会红，
+  但包照发，不会再有"绿的但发的是旧包"
