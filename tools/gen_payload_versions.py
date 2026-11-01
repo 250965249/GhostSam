@@ -164,9 +164,11 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
             problems.append(f"{variant}: no version code stamped in the payload")
 
         if spec["release_tag"] and not sidecar:
-            warnings.append(
-                f"{variant}: no sidecar at {sidecar_path.name}; "
-                "version name cannot be verified - update the producer workflow"
+            problems.append(
+                f"{variant}: no {sidecar_path.name} published by {spec['source']} - "
+                "the producer's auto-sync-build workflow has not run since the "
+                "sidecar was introduced (check that Actions is enabled on that repo), "
+                "so neither the version name nor the upstream distance can be verified"
             )
         if sidecar:
             if sidecar.get("version_code") and info["version_code"] is not None:
