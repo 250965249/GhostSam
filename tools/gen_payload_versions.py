@@ -99,22 +99,30 @@ def read_sidecar(path: Path) -> dict[str, str]:
 
 
 def format_label(display: str, name: str | None, code: int | None, sidecar: dict) -> str:
-    """`SukiSU-Ultra v4.3.0 (41128)` / `SukiSU-Ultra v4.3.0+44 (41128)`."""
+    """`SukiSU-Ultra v4.3.0 (41128)` / `SukiSU-Ultra v4.3.0+44 (41128)`.
+
+    A variant whose `userspace/ksud/build.rs` pins the stamp (KernelSU-Next)
+    gets a `pinned` marker, because otherwise the number would silently look
+    like a real, current version number forever.
+    """
     if code is None:
         return f"{display} unknown"
+
+    pinned = sidecar.get("version_pinned", "").lower() == "true"
+    marker = ", pinned" if pinned else ""
 
     # The sidecar is authoritative for the name when the ELF stamp is polluted
     # by a fork release tag (`latest-ksud`), because the producer deleted those
     # tags before running `git describe`.
     candidate = (sidecar.get("version_name") or "").strip() or name or ""
     if not candidate or is_polluted(candidate):
-        return f"{display} ({code})"
+        return f"{display} ({code}{marker})"
 
     parsed = parse_describe(candidate)
     tag = parsed["tag"]
     distance = parsed["distance"] or 0
     suffix = f"+{distance}" if distance else ""
-    return f"{display} v{tag}{suffix} ({code})"
+    return f"{display} v{tag}{suffix} ({code}{marker})"
 
 
 def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
@@ -205,6 +213,8 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
             "commit": sidecar.get("commit") or info["commit"],
             "commit_count": info["commit_count"],
             "built_at": sidecar.get("built_at"),
+            "version_pinned": sidecar.get("version_pinned", "").lower() == "true",
+            "git_version_name": sidecar.get("git_version_name"),
             "behind_upstream": int(sidecar["behind_upstream"])
             if sidecar.get("behind_upstream", "").isdigit()
             else None,
