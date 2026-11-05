@@ -385,3 +385,68 @@ https://github.com/250965249/GhostSam/releases/tag/latest-auto
   反查 APK 内清单 → 出包 → release notes 带四变体版本表与同步状态
 - 任一变体落后上游 / 缺 sidecar / 版本戳与树不符 / 载荷超过 48h，都会红，
   但包照发，不会再有"绿的但发的是旧包"
+
+---
+
+## 九、第二轮（2026-11-05/06）：让"自动"真的自动
+
+11-02 ~ 11-05 每天照常出包，但版本纹丝不动。两个独立原因：
+
+1. **SukiSU 每天合并冲突**。上游 `4.3.0-r1` → `4.3.0-r2` 一路改 `kernel/core/init.c`，
+   samsung 分支在同一处也有改动，`git merge` 冲突 → sync 执行 `merge --abort` →
+   分支永远不前进 → 每天编译的还是同一棵树 → payload 永远停在 41134。
+   上一轮我加的"冲突就报红"只是让它**可见**，没有让它**自动**。
+2. **nexT 的 release 步骤以退出码 1 静默失败**，payload 停在 11-01。
+
+### 9.1 自动解决合并冲突（SAMSUNG_OWNED）
+
+`auto-sync-build.yml` 的 sync 作业现在：
+
+- 合并冲突时先看**冲突文件是否都在 `SAMSUNG_OWNED` 白名单里**
+  （`kernel/core/init.c`、`Kbuild`、`Kconfig`、`patch_memory.c`、`tp_marker.c`、
+  `syscall_hook*`、`selinux_hide.c`、`app_profile.c`）；
+- 全是 → 重新 `git merge -X ours`：这些文件里 samsung 侧是权威内容，
+  编译（DDK LKM + ksud）是安全网，签名漂移会编译失败而不是发出坏包；
+- 有任何非白名单文件 → 仍然报红并列出文件名。
+
+实测（本地复现上游 30 个提交的合并）：`init.c` 保留了 samsung 的
+`ksu_samsung_kdp_init()` / `ksu_samsung_defex_init()` 顺序，同时**自动并入**
+上游新增的 `ret = ksu_selinux_inode_init()` 及其 `put_cred()` 清理，
+也没有重复调用 symbol resolver。其余 229 个上游改动全部合入。
+
+### 9.2 三处 CI 自身的坑
+
+| 坑 | 症状 | 修法 |
+|---|---|---|
+| `gh release upload --clobber` | `HTTP 422 ReleaseAsset.name already exists`，payload 已编译却发不出去 | 先 `gh release delete-asset` 再 upload |
+| `find … \| head -n1` 在 `set -o pipefail` 下 | 管道 SIGPIPE 被视为失败 → 赋值失败 → `set -e` 静默退出，日志里一行都没有 | `find … -print -quit` |
+| 假设 `VERSION_NAME` 字面量紧挨 `KSU_NO_NEW_PRIVS<code>` | nexT 改成 8 位 sha 后字面量被放到别处，读出空串 → 校验误判好包为坏包 | 校验改为「code 严格相等；name 有则必需相等，无则用 git 值」 |
+
+另外 nexT 的 `userspace/ksud/build.rs` 里那个版本钉死（`(33355, "3.4.2")` 丢弃 git 结果）
+已经去掉，现在它和另外两个变体一样从 git 取值。所有 producer 的 release 步骤都加了
+`trap 'echo "::error::release step failed at line $LINENO"' ERR`，
+下次失败能直接看到行号（这个 job 的 stdout 在 GitHub 上会被吞掉，只有 stderr 可靠）。
+
+### 9.3 当前状态
+
+| 变体 | 版本 | 相对上游 | producer |
+|---|---|---|---|
+| `ksud`（tiann 官方） | 32680 `3.3.1` | 每次现拉最新 release | — |
+| `ksud-sukisu` | **41167** `4.3.0-r2-17-g1c0913bd` | **0 落后**（上游 `4.3.0-r2`） | ✅ 绿 |
+| `ksud-bakasu` | **35270** `4.2.0-r2…-99-g1504e901` | **0 落后** | ✅ 绿 |
+| `ksud-next` | 33355 `3.4.2` | 与上游同步 | ❌ release 步骤仍失败 |
+
+**成品**：`GhostSam_auto_20261105.apk`，25,057,808 字节
+`sha256 6e46cde29ae3b9d13418f7e18ea1cdaad572865322335de33a6abfb38428e4e2`
+（已下载比对，包内 `sukisu=SukiSU-Ultra v4.3.0-r2+17 (41167)`、
+`bakasu=BakaSU v4.2.0-rc3+99 (35270)`）
+
+### 9.4 还差的一步
+
+nexT 的 release 步骤仍未跑通，且本次会话里我的 `gh` OAuth token 失效
+（`The token in keyring is invalid`），无法再手动触发去拿日志。
+**今晚 02:00（Asia/Shanghai）的定时任务会自动重跑**，届时
+`::error::release step failed at line N` 会直接指出是哪一行。
+
+在此之前 SukiSU / BakaSU 两条链已经完全自愈：合并冲突自动解决、
+版本跟着上游走、出包即绿，不需要人工介入。
