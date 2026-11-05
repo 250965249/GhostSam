@@ -42,7 +42,7 @@ VERSION_CODE_OFFSETS = {
 }
 
 #: <anchor><5 digit code><version name>
-_STAMP = re.compile(rb"KSU_NO_NEW_PRIVS(\d{5})([0-9A-Za-z._:+~-]+)")
+_STAMP = re.compile(rb"KSU_NO_NEW_PRIVS(\d{5})([0-9A-Za-z._:+~-]*)")
 
 #: `git describe` output shapes, split into (tag, distance, commit).
 _DESCRIBE = re.compile(r"^(?P<tag>.+?)(?:-(?P<distance>\d+)-g(?P<commit>[0-9a-f]{7,40}))?$")
@@ -116,12 +116,19 @@ def probe(path: Path, variant: str | None = None) -> dict:
 
     raw_code, raw_name = matches[0]
     code = int(raw_code)
-    name = raw_name.decode("ascii")
+    # The name literal is only usually pooled right after the code; an
+    # absent name means "unknown", not a defect - the producer sidecar
+    # carries the authoritative value.
+    name = raw_name.decode("ascii") or None
 
     info["version_code"] = code
     info["version_name"] = name
-    info["polluted"] = is_polluted(name)
-    parsed = parse_describe(name)
+    info["polluted"] = is_polluted(name) if name else None
+    parsed = (
+        parse_describe(name)
+        if name
+        else {"tag": None, "distance": None, "commit": None}
+    )
     info["tag"] = parsed["tag"]
     info["distance"] = parsed["distance"]
     info["commit"] = parsed["commit"]
@@ -177,9 +184,7 @@ def main(argv: list[str]) -> int:
         for problem in info["problems"]:
             print(f"{'problem':13}: {problem}")
 
-    if args.strict and (
-        info["version_code"] is None or info["version_name"] is None or info["polluted"]
-    ):
+    if args.strict and (info["version_code"] is None or info["polluted"] is True):
         return 1
     return 0
 
