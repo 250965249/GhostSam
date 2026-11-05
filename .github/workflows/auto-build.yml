@@ -381,6 +381,13 @@ jobs:
           echo "TAG=$tag" >> "$GITHUB_ENV"
           apk=$(find dist -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$apk"
+          # name the APK after the release tag so the asset and the tag agree
+          renamed="dist/GhostSam_${tag#auto-}.apk"
+          if [ "$apk" != "$renamed" ]; then
+            mv "$apk" "$renamed"
+            apk="$renamed"
+          fi
+          sha256sum dist/*.apk > dist/checksums.txt
           python3 tools/render_release_notes.py \
             --lock dist/payloads.lock.json \
             --previous prev/payloads.lock.json \
