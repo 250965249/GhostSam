@@ -1,13 +1,12 @@
 name: Auto Build GhostSam
 
-# Daily: sync GhostSam upstream, fetch the latest four ksud payloads, regenerate
-# the payload version manifest from those binaries, build and sign GhostSam.
-#
-# The manifest (app/app/src/main/assets/payloads/ksud/versions.properties) is the
-# only thing the settings screen reads for "KernelSU 版本 → 当前 Payload：…", so it is
-# regenerated from the payloads that actually ship in this APK. It is never
-# carried over from a previous run, which is what used to freeze the label at
-# 41098 while newer binaries were already being bundled.
+# Every run publishes a NEW release (tag `auto-YYYYMMDD-HHMM`) containing:
+#   * the signed GhostSam APK + its checksums
+#   * the SukiSU-Ultra and BakaSU root manager APKs, signed with the same
+#     certificate GhostSam itself uses (that is the cert KernelSuProbe.kt
+#     expects, so an installed manager signed any other way is not recognised)
+#   * payloads.lock.json, so the next run can describe what changed
+# `latest-auto` stays as a pointer release whose notes link to the newest build.
 #
 # Requires repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD.
 on:
@@ -30,9 +29,8 @@ concurrency:
 env:
   PAYLOAD_DIR: app/app/src/main/assets/payloads/ksud
   SIDECAR_DIR: payloads-sidecars
-  # Outside assets/: app/build.gradle.kts `verifyPayloads` rejects any file in
-  # assets/payloads/ksud that is not one of the fixed PackRole entries.
   LOCK_FILE: payloads.lock.json
+  COMPILE_SDK: "36"
 
 jobs:
   sync:
@@ -60,11 +58,11 @@ jobs:
   build:
     needs: sync
     runs-on: ubuntu-latest
+    outputs:
+      stale: ${{ steps.manifest.outputs.stale }}
     steps:
       - uses: actions/checkout@v7
         with:
-          # Branch tip, not the sha that triggered the run: the sync job above
-          # may have pushed a new merge commit seconds ago.
           ref: bakasu
           fetch-depth: 0
 
@@ -79,7 +77,6 @@ jobs:
             curl -fL --retry 3 --retry-delay 5 --connect-timeout 20 -o "$2" "$1"
           }
 
-          # --- binaries -------------------------------------------------------
           fetch https://github.com/tiann/KernelSU/releases/latest/download/ksud-aarch64-linux-android \
                 "$base/ksud"
           fetch https://github.com/250965249/KernelSU-Next-Samsung/releases/download/latest-ksud/ksud-next-aarch64 \
@@ -89,10 +86,6 @@ jobs:
           fetch https://github.com/250965249/BakaSU/releases/download/latest-ksud/ksud-bakasu-aarch64 \
                 "$base/ksud-bakasu"
 
-          # --- producer version sidecars --------------------------------------
-          # Emitted by each fork's auto-sync-build workflow. They carry the real
-          # version_name (the binary alone cannot express it once a fork release
-          # tag has polluted `git describe`) plus the upstream distance.
           sidecar() { # $1=variant $2=repo
             local asset="ksud-$1-aarch64.version"
             if curl -fsSL --retry 2 --connect-timeout 20 \
@@ -101,14 +94,13 @@ jobs:
               echo "sidecar: $1 ok"
             else
               rm -f "$side/ksud-$1.version"
-              echo "::warning::no version sidecar for $1 ($2) — the label falls back to the code stamped in the binary. Upgrade that producer's auto-sync-build workflow."
+              echo "::warning::no version sidecar for $1 ($2) - the label falls back to the code stamped in the binary"
             fi
           }
           sidecar next   250965249/KernelSU-Next-Samsung
           sidecar sukisu 250965249/SukiSU-Ultra
           sidecar bakasu 250965249/BakaSU
 
-          # --- sanity: four little-endian ELF executables, none truncated ------
           for f in ksud ksud-next ksud-sukisu ksud-bakasu; do
             test -s "$base/$f"
             head -c4 "$base/$f" | od -An -tx1 | grep -q '7f 45 4c 46'
@@ -126,8 +118,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # What is committed today may already be stale - that is precisely the
-          # bug this fixes - so report the drift and then overwrite it.
           if ! python3 tools/gen_payload_versions.py \
                  --payloads "$PAYLOAD_DIR" \
                  --sidecars "$SIDECAR_DIR" \
@@ -142,10 +132,10 @@ jobs:
             --lock-out "$LOCK_FILE" \
             --write --allow-problems
 
-          # Determinism guard: a second pass must reproduce the same bytes.
           python3 tools/gen_payload_versions.py \
             --payloads "$PAYLOAD_DIR" \
             --sidecars "$SIDECAR_DIR" \
+            --lock-out "$LOCK_FILE" \
             --check --allow-problems >/dev/null
 
           echo "--- $PAYLOAD_DIR/versions.properties ---"
@@ -163,14 +153,16 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Install Android 36 / NDK
+      - name: Install Android SDK / NDK
         run: |
           set -e
           export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n1)"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" --install "platforms;android-36" "build-tools;36.0.0" "ndk;30.0.16248370"
+          "$SDKMANAGER" --install "platforms;android-${COMPILE_SDK}" \
+                                "build-tools;${COMPILE_SDK}.0.0" \
+                                "ndk;30.0.16248370"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
 
       - name: Write signing config
@@ -193,10 +185,8 @@ jobs:
         run: |
           set -e
           cd app
-          # The hosted runner has no Android 37 package yet. GhostSam targets API 36;
-          # compile with SDK 36 and skip the dependency AAR compileSdk warning check.
-          sed -i 's/compileSdk = 37/compileSdk = 36/' app/build.gradle.kts
-          sed -i 's/ndkVersion = "30.0.15729638"/ndkVersion = "30.0.16248370"/' app/build.gradle.kts
+          sed -i "s/compileSdk = 37/compileSdk = ${COMPILE_SDK}/" app/build.gradle.kts
+          sed -i "s/ndkVersion = \"30.0.15729638\"/ndkVersion = \"30.0.16248370\"/" app/build.gradle.kts
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace \
             -Pandroid.experimental.disableCompileSdkChecks=true
@@ -210,44 +200,250 @@ jobs:
           diff -u "$PAYLOAD_DIR/versions.properties" /tmp/apk-versions.properties
           echo "::notice::shipped manifest matches the bundled payloads"
           cat /tmp/apk-versions.properties
-          for f in ksud ksud-next ksud-sukisu ksud-bakasu; do
-            unzip -l "$apk" "assets/payloads/ksud/$f" | tail -n1
+
+      - name: Stage release assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp app/app/build/outputs/apk/release/app-release.apk \
+             "dist/GhostSam_auto_$(date -u +%Y%m%d-%H%M).apk"
+          cp "$LOCK_FILE" dist/payloads.lock.json
+          cp "$PAYLOAD_DIR/versions.properties" dist/versions.properties
+          sha256sum dist/*.apk > dist/checksums.txt
+          ls -l dist
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ghostsam-app
+          path: dist/*
+          if-no-files-found: error
+
+  # The two root managers ride along with every GhostSam build. They are built
+  # from the producer sources and signed with the GhostSam keystore on purpose:
+  # KernelSuProbe.kt pins BAKASU_MANAGER_CERT_SHA256 to that certificate, so a
+  # manager signed any other way is treated as "not installed".
+  managers:
+    needs: sync
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: sukisu
+            repo: 250965249/SukiSU-Ultra
+            branch: samsung
+            gradle_args: ""
+            out_name: GhostSam-manager-SukiSU.apk
+          - variant: bakasu
+            repo: 250965249/BakaSU
+            branch: samsung
+            gradle_args: "-PKSU_PACKAGE_NAME=com.resukisu.resukisu -PKSU_NAME=BakaSU"
+            out_name: GhostSam-manager-BakaSU.apk
+    steps:
+      - name: Checkout ${{ matrix.repo }}
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ matrix.repo }}
+          ref: ${{ matrix.branch }}
+          path: src
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Android SDK for the manager
+        run: |
+          set -u
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          for pkg in "platforms;android-37" "platforms;android-36" \
+                     "build-tools;37.0.0" "build-tools;36.1.0" "build-tools;36.0.0"; do
+            if "$SDKMANAGER" --install "$pkg" >/dev/null 2>&1; then
+              echo "installed $pkg"
+            else
+              echo "::warning::could not install $pkg"
+            fi
           done
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Write manager signing config
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/manager.jks"
+          {
+            echo ""
+            echo "# injected by the GhostSam auto-build workflow"
+            echo "KEYSTORE_FILE=$GITHUB_WORKSPACE/manager.jks"
+            echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PASSWORD=$KEY_PASSWORD"
+          } >> src/manager/gradle.properties
+          tail -n 7 src/manager/gradle.properties
+
+      - name: Build ${{ matrix.variant }} manager APK
+        working-directory: src/manager
+        run: |
+          set -euo pipefail
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace assembleRelease ${{ matrix.gradle_args }}
+
+      - name: Collect the manager APK
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          target=""
+          for apk in src/manager/app/build/outputs/apk/release/*.apk; do
+            [ -f "$apk" ] || continue
+            case "$apk" in *spoof*|*unsigned*) continue ;; esac
+            target="$apk"
+            break
+          done
+          if [ -z "$target" ]; then
+            echo "::error::no release APK was produced"
+            find src/manager/app/build/outputs -maxdepth 4 -type f -name '*.apk' || true
+            exit 1
+          fi
+          echo "picked $target"
+          cp "$target" "dist/${{ matrix.out_name }}"
+          sha256sum dist/*.apk
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: manager-${{ matrix.variant }}
+          path: dist/*.apk
+          if-no-files-found: error
+
+  publish:
+    needs: [build, managers]
+    if: ${{ always() && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: bakasu
+          fetch-depth: 1
+
+      - name: Download the app artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: ghostsam-app
+          path: dist
+
+      - name: Download the SukiSU manager
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: manager-sukisu
+          path: managers
+
+      - name: Download the BakaSU manager
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: manager-bakasu
+          path: managers
+
+      - name: List what we have
+        run: |
+          set -u
+          ls -lR dist managers 2>/dev/null || true
+
+      - name: Fetch the previous release lock
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          mkdir -p prev
+          prev_tag=$(gh release list --exclude-drafts --limit 60 \
+            --json tagName,publishedAt \
+            --jq '[.[] | select(.tagName | startswith("auto-"))] | sort_by(.publishedAt) | reverse | .[0].tagName // empty')
+          echo "previous release: ${prev_tag:-none}"
+          if [ -n "${prev_tag:-}" ]; then
+            gh release download "$prev_tag" --pattern payloads.lock.json --dir prev --clobber || true
+          fi
+          ls -l prev || true
 
       - name: Compose release notes
         run: |
           set -euo pipefail
-          {
-            echo "Automatically synced upstream GhostSam + latest KernelSU / KernelSU-Next / SukiSU / BakaSU ksud payloads."
-            echo
-            cat /tmp/payload-table.md
-            echo
-            echo "Manifest generated $(date -u +%Y-%m-%dT%H:%M:%SZ) from the binaries bundled in this APK."
-          } > /tmp/release-notes.md
+          tag=$(date -u +auto-%Y%m%d-%H%M)
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          apk=$(find dist -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$apk"
+          python3 tools/render_release_notes.py \
+            --lock dist/payloads.lock.json \
+            --previous prev/payloads.lock.json \
+            --apk "$apk" \
+            --managers managers \
+            --tag "$tag" \
+            --out /tmp/release-notes.md
+          cat /tmp/release-notes.md
           cat /tmp/release-notes.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publish latest-auto release
+      - name: Create the release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          apk="app/app/build/outputs/apk/release/app-release.apk"
-          out="GhostSam_auto_$(date -u +%Y%m%d).apk"
-          cp "$apk" "$out"
-          sha256sum "$out" > "$out.sha256"
-          if ! gh release view latest-auto >/dev/null 2>&1; then
-            gh release create latest-auto --title "GhostSam auto build" \
-              --notes-file /tmp/release-notes.md
-          else
-            gh release edit latest-auto --notes-file /tmp/release-notes.md
-          fi
-          gh release upload latest-auto "$out" "$out.sha256" --clobber
-          echo "::notice::published $out"
+          gh release create "$TAG" \
+            --title "GhostSam ${TAG#auto-}" \
+            --notes-file /tmp/release-notes.md \
+            dist/*.apk dist/checksums.txt dist/payloads.lock.json dist/versions.properties
+          echo "::notice::published $TAG"
 
-      # Publish first, then go red: a stale payload must never look like success,
-      # but silently withholding the daily APK would hide the problem even better.
-      - name: Fail when a payload is behind its upstream
-        if: ${{ steps.manifest.outputs.stale == 'true' && inputs.allow_stale_payloads != true }}
+      - name: Attach the root managers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "::error::At least one ksud payload is out of sync with its upstream CI build. See the payload table in the release notes: the producing repo's auto-sync-build workflow hit a merge conflict, lost its schedule, or built a stale checkout."
+          set -u
+          if compgen -G "managers/*.apk" > /dev/null; then
+            sha256sum managers/*.apk > /tmp/managers.sha256
+            gh release upload "$TAG" managers/*.apk /tmp/managers.sha256
+            echo "::notice::attached manager APKs"
+          else
+            echo "::warning::no manager APK was built this run - the release has none"
+          fi
+
+      - name: Move the latest-auto pointer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          notes="最新自动构建：[\`$TAG\`](../../releases/tag/$TAG)"
+          if gh release view latest-auto >/dev/null 2>&1; then
+            # keep the old URL alive without storing a second copy of the APK
+            for a in $(gh release view latest-auto --json assets --jq '.assets[].name'); do
+              gh release delete-asset latest-auto "$a" --yes >/dev/null 2>&1 || true
+            done
+            gh release edit latest-auto --notes "$notes"
+          else
+            gh release create latest-auto --title "GhostSam latest auto build" --notes "$notes"
+          fi
+
+      - name: Fail when a payload is behind its upstream
+        if: ${{ needs.build.outputs.stale == 'true' && inputs.allow_stale_payloads != true }}
+        run: |
+          echo "::error::at least one ksud payload is out of sync with its upstream CI build - see the notes of $TAG"
           exit 1
+
+      - name: Fail when a root manager is missing
+        run: |
+          set -u
+          missing=""
+          [ -f "managers/GhostSam-manager-SukiSU.apk" ] || missing="$missing SukiSU"
+          [ -f "managers/GhostSam-manager-BakaSU.apk" ] || missing="$missing BakaSU"
+          if [ -n "$missing" ]; then
+            echo "::error::manager APK missing for:$missing - open the 'managers' job log; the release was still published without it"
+            exit 1
+          fi
