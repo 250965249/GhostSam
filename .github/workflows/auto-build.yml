@@ -209,7 +209,7 @@ jobs:
              "dist/GhostSam_auto_$(date -u +%Y%m%d-%H%M).apk"
           cp "$LOCK_FILE" dist/payloads.lock.json
           cp "$PAYLOAD_DIR/versions.properties" dist/versions.properties
-          sha256sum dist/*.apk > dist/checksums.txt
+          ( cd dist && sha256sum *.apk > checksums.txt )
           ls -l dist
 
       - uses: actions/upload-artifact@v7
@@ -387,7 +387,7 @@ jobs:
             mv "$apk" "$renamed"
             apk="$renamed"
           fi
-          sha256sum dist/*.apk > dist/checksums.txt
+          ( cd dist && sha256sum *.apk > checksums.txt )
           python3 tools/render_release_notes.py \
             --lock dist/payloads.lock.json \
             --previous prev/payloads.lock.json \
@@ -403,10 +403,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          files=""
+          for f in dist/*.apk dist/checksums.txt dist/payloads.lock.json dist/versions.properties; do
+            [ -f "$f" ] && files="$files $f"
+          done
+          test -n "$files"
           gh release create "$TAG" \
             --title "GhostSam ${TAG#auto-}" \
             --notes-file /tmp/release-notes.md \
-            dist/*.apk dist/checksums.txt dist/payloads.lock.json dist/versions.properties
+            $files
           echo "::notice::published $TAG"
 
       - name: Attach the root managers
@@ -415,8 +420,8 @@ jobs:
         run: |
           set -u
           if compgen -G "managers/*.apk" > /dev/null; then
-            sha256sum managers/*.apk > /tmp/managers.sha256
-            gh release upload "$TAG" managers/*.apk /tmp/managers.sha256
+            ( cd managers && sha256sum *.apk > ../managers.sha256 )
+            gh release upload "$TAG" managers/*.apk managers.sha256
             echo "::notice::attached manager APKs"
           else
             echo "::warning::no manager APK was built this run - the release has none"
