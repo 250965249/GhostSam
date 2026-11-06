@@ -450,3 +450,63 @@ nexT 的 release 步骤仍未跑通，且本次会话里我的 `gh` OAuth token 
 
 在此之前 SukiSU / BakaSU 两条链已经完全自愈：合并冲突自动解决、
 版本跟着上游走、出包即绿，不需要人工介入。
+
+---
+
+## 十、Releases 机制改造（2026-11-06）
+
+按 "每次新编译都发一个新 Release，并带上同版本的 SukiSU / BakaSU 管理器" 实现。
+
+### 10.1 每次构建一个独立 Release
+
+- tag：`auto-<UTC 时间戳>`（例如 `auto-20261105-1823`），标题 `GhostSam <时间戳>`
+- 资产：`GhostSam_<时间戳>.apk`、`checksums.txt`、`payloads.lock.json`、`versions.properties`、
+  `GhostSam-manager-SukiSU.apk`、`GhostSam-manager-BakaSU.apk`、`managers.sha256`
+- `latest-auto` 保留为**指针**：清空资产、正文改成指向最新那个 tag 的链接，老书签不会 404，
+  也不会把 25MB 存两份
+- Release 正文由 `tools/render_release_notes.py` 生成：
+  - 四个变体的当前载荷版本 + 相对上游 CI 的落后情况
+  - **和上一个 auto Release 的差异**（谁从什么版本升到什么版本，差多少个版本号）
+  - 管理器来源表（哪个仓库、哪个 tag、文件大小）
+  - 载荷异常时的警告
+
+差异对比靠每个 Release 附带的 `payloads.lock.json`：下一次构建会
+`gh release download <上一个 tag> --pattern payloads.lock.json` 拿来做 diff。
+
+### 10.2 管理器直接取上游已构建好的 APK
+
+不再在 GhostSam 里 checkout 上游源码重跑 gradle（那是之前那版的做法，白跑 10 分钟）。
+
+`tools/fetch_managers.py` 的逻辑：
+
+1. 读 ksud 的 sidecar 拿到 `version_name`，例如 `4.3.0-r2-17-g1c0913bd`；
+2. 去掉 `-<n>-g<sha>` 后缀得到基准版本 `4.3.0-r2`，找 `v4.3.0-r2` 这个 Release；
+3. 在该 Release 里挑管理器 APK：优先 `universal-release`，其次非 spoofed 的 `-release`，
+   再次 `arm64-v8a`；
+4. 下载并改名成 `GhostSam-manager-<变体>.apk`，把仓库 / tag / 资产名 / sha256
+   写进 `managers/managers.json` 供正文使用；
+5. 找不到完全对应的 tag 时退回最新一个带 APK 的 Release，并在正文里标注。
+
+实测（本机跑通）：
+
+```
+sukisu: SukiSU-Ultra/SukiSU-Ultra v4.3.0-r2 -> SukiSU_v4.3.0-r2_41150-release.apk (20131351 bytes, match=exact)
+bakasu: Baka-SU/BakaSU            v4.2.0-rc3 -> ReSukiSU_v4.2.0-rc3_35171-universal-release.apk (15679795 bytes, match=exact)
+```
+
+### 10.3 随之调整的一处代码
+
+`KernelSuProbe.kt` 里 `BAKASU_MANAGER_CERT_SHA256` 原来是 GhostSam 自己那张证书
+（`8113db5e…`，因为以前的管理器是本地重签的）。现在发的是 BakaSU 官方签名的包，
+实测证书指纹是 `d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64`，
+常量已跟着改。SukiSU 的 `947ae944…` 与上游 `SukiSU_v4.3.0-r2_41150-release.apk`
+实测一致，无需改动。
+
+### 10.4 一个外部阻塞
+
+改造过程中 GitHub 开始对 `250965249/GhostSam` 返回
+`HTTP 422: Actions has been disabled for this repository`
+（`workflow_dispatch` 和 push 事件都被拒），而同一账号下的 `250965249/BakaSU`
+仍可正常派发。原因是 **GhostSam 本身是 `snothin/GhostSam` 的 fork**（API 现在报
+`fork: true`），fork 仓库的 Actions 需要仓库所有者在 Actions 页面手动启用。
+点一次之后定时任务与手动派发都会恢复。
