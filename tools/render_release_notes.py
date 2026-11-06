@@ -100,19 +100,48 @@ def changes_section(lock: dict, previous: dict | None) -> list[str]:
 
 def managers_section(managers_dir: Path) -> list[str]:
     if not managers_dir.is_dir():
-        return ["本次没有附上 root 管理器（构建失败，见运行日志）。"]
+        return ["本次没有附上 root 管理器（下载失败，见运行日志）。"]
+
+    info: list[dict] = []
+    report = managers_dir / "managers.json"
+    if report.is_file():
+        try:
+            info = json.loads(report.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            info = []
+
+    if info:
+        lines = [
+            "| 管理器 | 来源 | 版本 | 文件 | 大小 |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for entry in info:
+            size_mb = entry.get("size", 0) / (1024 * 1024)
+            lines.append(
+                f"| {entry.get('display')} | `{entry.get('repo')}` "
+                f"| `{entry.get('tag')}` | `{entry.get('file')}` | {size_mb:.1f} MB |"
+            )
+        lines.append("")
+        lines.append(
+            "管理器直接取自上游 release，与上面的 ksud 版本一一对应，签名用的是各项目自己的证书。"
+        )
+        fallbacks = [e for e in info if e.get("match") not in (None, "exact")]
+        if fallbacks:
+            lines.append("")
+            for entry in fallbacks:
+                lines.append(
+                    f"- ⚠️ {entry.get('display')}：没找到与 ksud "
+                    f"`{entry.get('ksud_version')}` 完全对应的 release，退回最新的 "
+                    f"`{entry.get('tag')}`"
+                )
+        return lines
+
     apks = sorted(p for p in managers_dir.rglob("*.apk"))
     if not apks:
-        return ["本次没有附上 root 管理器（构建失败，见运行日志）。"]
+        return ["本次没有附上 root 管理器（下载失败，见运行日志）。"]
     lines = ["| 管理器 | 文件 | sha256 |", "| --- | --- | --- |"]
     for apk in apks:
         lines.append(f"| {apk.stem} | `{apk.name}` | `{sha256(apk)[:32]}…` |")
-    licensed = [p.name for p in apks]
-    lines.append("")
-    lines.append("管理器用 GhostSam 同一张证书签名，可直接与 GhostSam 共存安装。")
-    lines.append("装机顺序：先刷 `ksud-*` 对应的内核，再装同名管理器。")
-    lines.append("")
-    lines.append("附带文件：" + "、".join(f"`{n}`" for n in licensed))
     return lines
 
 

@@ -34,9 +34,10 @@ object KernelSuProbe {
     private const val SUKISU_MANAGER_CERT_SHA256 =
         "947ae944f3de4ed4c21a7e4f7953ecf351bfa2b36239da37a34111ad29993eef"
 
-    /** BakaSU manager signing-cert SHA-256 (GhostSam test key used for the bundled manager). */
+    /** BakaSU manager signing-cert SHA-256 (Baka-SU/BakaSU release key - the manager shipped
+     *  with every GhostSam build comes straight from that release). */
     private const val BAKASU_MANAGER_CERT_SHA256 =
-        "8113db5e7d0b0de1a4635236a477083c85aeb94088595eee4c89705cf4cdab23"
+        "d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64"
 
     @Volatile
     private var ksuNextCertPackages: List<String> = emptyList()
