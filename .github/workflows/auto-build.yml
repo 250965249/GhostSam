@@ -12,6 +12,14 @@ name: Auto Build GhostSam
 on:
   schedule:
     - cron: "0 21 * * *"   # 05:00 Asia/Shanghai
+  # workflow_dispatch keeps getting rejected with HTTP 422 ("Actions has been
+  # disabled for this repository") on this account even though the workflow is
+  # active, so a push that touches .github/ci-trigger is the reliable "run now"
+  # button. Nothing else in the tree triggers a build.
+  push:
+    branches: [bakasu]
+    paths:
+      - '.github/ci-trigger'
   workflow_dispatch:
     inputs:
       allow_stale_payloads:
