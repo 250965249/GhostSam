@@ -10,8 +10,15 @@ name: Auto Build GhostSam
 #
 # Requires repository secrets: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD.
 on:
+  # GitHub's scheduler for this account is unreliable: the producers' 18:00 UTC
+  # slot actually fires around 22:30 UTC, and GhostRun's 21:00 UTC slot was
+  # skipped outright on 2026-11-06 with no run entry at all. Fire three times a
+  # day; the `gate` job skips the extra attempts once that day's release exists,
+  # and manual runs always build.
   schedule:
     - cron: "0 21 * * *"   # 05:00 Asia/Shanghai
+    - cron: "0 1 * * *"    # 09:00 Asia/Shanghai (catch-up)
+    - cron: "0 5 * * *"    # 13:00 Asia/Shanghai (catch-up)
   # workflow_dispatch keeps getting rejected with HTTP 422 ("Actions has been
   # disabled for this repository") on this account even though the workflow is
   # active, so a push that touches .github/ci-trigger is the reliable "run now"
@@ -41,7 +48,37 @@ env:
   COMPILE_SDK: "36"
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: Decide whether this trigger should build
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "::notice::${{ github.event_name }} trigger - building"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          today=$(date -u +%Y%m%d)
+          existing=$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 \
+            --json tagName \
+            --jq "[.[] | select(.tagName | startswith(\"auto-$today\"))] | .[0] // empty")
+          if [ -n "${existing:-}" ]; then
+            echo "::notice::already published $existing today - skipping this scheduled attempt"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::nothing published for $today yet - building"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   sync:
+    needs: gate
+    if: ${{ needs.gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
