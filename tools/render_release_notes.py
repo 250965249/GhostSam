@@ -83,7 +83,9 @@ def changes_section(lock: dict, previous: dict | None) -> list[str]:
             lines.append(f"| {LABEL.get(name, name)} | 新增 |")
             changed += 1
             continue
-        if c_sha == o_sha:
+        # Only report real version movement: a producer rebuild of the same
+        # commit changes the binary hash but not the version, and that is noise.
+        if c_code == o_code and c.get('version_name') == o.get('version_name'):
             continue
         delta = ""
         if isinstance(c_code, int) and isinstance(o_code, int) and c_code != o_code:
