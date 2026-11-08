@@ -112,34 +112,49 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch latest ksud payloads
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           base="${PAYLOAD_DIR}"
           side="${SIDECAR_DIR}"
           mkdir -p "$base" "$side"
 
-          # GitHub's release CDN intermittently answers 504 and plain --retry
-          # does not cover HTTP errors, so retry every failure with a longer
-          # window instead of dying in the first step.
-          fetch() { # $1=url $2=dest
-            curl -fL --retry 8 --retry-delay 10 --retry-all-errors \
-                 --connect-timeout 20 --max-time 300 -o "$2" "$1"
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+
+          # github.com/<repo>/releases/download/... intermittently answers 504 for
+          # minutes at a time (seen right after a producer re-uploaded an asset),
+          # while the API asset endpoint keeps serving the same file. Go through
+          # the API and keep curl only as a fallback.
+          fetch_gh() { # $1=repo $2=tag-or-empty $3=asset $4=dest
+            local dir="$work/f$RANDOM"
+            mkdir -p "$dir"
+            if [ -n "$2" ]; then
+              gh release download "$2" -R "$1" --pattern "$3" --dir "$dir" --clobber
+            else
+              gh release download -R "$1" --pattern "$3" --dir "$dir" --clobber
+            fi
+            test -f "$dir/$3"
+            mv "$dir/$3" "$4"
+            echo "$3 -> $4 ($(stat -c%s "$4") bytes)"
           }
 
-          fetch https://github.com/tiann/KernelSU/releases/latest/download/ksud-aarch64-linux-android \
-                "$base/ksud"
-          fetch https://github.com/250965249/KernelSU-Next-Samsung/releases/download/latest-ksud/ksud-next-aarch64 \
-                "$base/ksud-next"
-          fetch https://github.com/250965249/SukiSU-Ultra/releases/download/latest-ksud/ksud-sukisu-aarch64 \
-                "$base/ksud-sukisu"
-          fetch https://github.com/250965249/BakaSU/releases/download/latest-ksud/ksud-bakasu-aarch64 \
-                "$base/ksud-bakasu"
+          fetch_gh tiann/KernelSU "" \
+                   ksud-aarch64-linux-android "$base/ksud"
+          fetch_gh 250965249/KernelSU-Next-Samsung latest-ksud \
+                   ksud-next-aarch64 "$base/ksud-next"
+          fetch_gh 250965249/SukiSU-Ultra latest-ksud \
+                   ksud-sukisu-aarch64 "$base/ksud-sukisu"
+          fetch_gh 250965249/BakaSU latest-ksud \
+                   ksud-bakasu-aarch64 "$base/ksud-bakasu"
 
           sidecar() { # $1=variant $2=repo
             local asset="ksud-$1-aarch64.version"
-            if curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 20 \
-                 -o "$side/ksud-$1.version" \
-                 "https://github.com/$2/releases/download/latest-ksud/$asset"; then
+            local dir="$work/s$RANDOM"
+            mkdir -p "$dir"
+            if gh release download latest-ksud -R "$2" --pattern "$asset" --dir "$dir" --clobber 2>/dev/null; then
+              mv "$dir/$asset" "$side/ksud-$1.version"
               echo "sidecar: $1 ok"
             else
               rm -f "$side/ksud-$1.version"
@@ -150,6 +165,8 @@ jobs:
           sidecar sukisu 250965249/SukiSU-Ultra
           sidecar bakasu 250965249/BakaSU
 
+          # A plain `file`-style check is not available on every runner image, so
+          # verify the ELF magic and a sane size by hand.
           for f in ksud ksud-next ksud-sukisu ksud-bakasu; do
             test -s "$base/$f"
             head -c4 "$base/$f" | od -An -tx1 | grep -q '7f 45 4c 46'
@@ -286,17 +303,22 @@ jobs:
           fetch-depth: 1
 
       - name: Fetch the ksud version sidecars
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p "${SIDECAR_DIR}"
           sidecar() { # $1=variant $2=repo
             local asset="ksud-$1-aarch64.version"
-            if ! curl -fsSL --retry 3 --connect-timeout 20 \
-                 -o "${SIDECAR_DIR}/ksud-$1.version" \
-                 "https://github.com/$2/releases/download/latest-ksud/$asset"; then
+            local dir
+            dir=$(mktemp -d)
+            if gh release download latest-ksud -R "$2" --pattern "$asset" --dir "$dir" --clobber 2>/dev/null; then
+              mv "$dir/$asset" "${SIDECAR_DIR}/ksud-$1.version"
+            else
               rm -f "${SIDECAR_DIR}/ksud-$1.version"
               echo "::warning::no sidecar for $1 - the manager is picked from the newest release instead"
             fi
+            rm -rf "$dir"
           }
           sidecar sukisu 250965249/SukiSU-Ultra
           sidecar bakasu 250965249/BakaSU
