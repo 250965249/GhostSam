@@ -118,8 +118,12 @@ jobs:
           side="${SIDECAR_DIR}"
           mkdir -p "$base" "$side"
 
+          # GitHub's release CDN intermittently answers 504 and plain --retry
+          # does not cover HTTP errors, so retry every failure with a longer
+          # window instead of dying in the first step.
           fetch() { # $1=url $2=dest
-            curl -fL --retry 3 --retry-delay 5 --connect-timeout 20 -o "$2" "$1"
+            curl -fL --retry 8 --retry-delay 10 --retry-all-errors \
+                 --connect-timeout 20 --max-time 300 -o "$2" "$1"
           }
 
           fetch https://github.com/tiann/KernelSU/releases/latest/download/ksud-aarch64-linux-android \
@@ -133,7 +137,7 @@ jobs:
 
           sidecar() { # $1=variant $2=repo
             local asset="ksud-$1-aarch64.version"
-            if curl -fsSL --retry 2 --connect-timeout 20 \
+            if curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 20 \
                  -o "$side/ksud-$1.version" \
                  "https://github.com/$2/releases/download/latest-ksud/$asset"; then
               echo "sidecar: $1 ok"
