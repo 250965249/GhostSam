@@ -247,6 +247,36 @@ jobs:
           keyPassword=$KEY_PASSWORD
           EOF
 
+      - name: Point the Gradle wrapper at a reachable mirror
+        run: |
+          set -euo pipefail
+          props=app/gradle/wrapper/gradle-wrapper.properties
+          test -f "$props"
+          line=$(sed -n 's/^distributionUrl=//p' "$props")
+          dist=${line##*/}
+          dist=${dist//\\/}
+          echo "distribution: $dist"
+          chosen=""
+          for base in \
+            https://mirrors.cloud.tencent.com/gradle \
+            https://mirrors.huaweicloud.com/gradle \
+            https://services.gradle.org/distributions; do
+            url="$base/$dist"
+            if curl -fsS --max-time 25 -r 0-1023 -o /dev/null "$url"; then
+              chosen="$url"
+              break
+            fi
+            echo "::warning::unreachable Gradle distribution host: $url"
+          done
+          if [ -z "$chosen" ]; then
+            echo "::error::no reachable Gradle distribution host - cannot build"
+            exit 1
+          fi
+          # gradle-wrapper.properties escapes the colon of the URL
+          escaped=$(printf '%s' "$chosen" | sed 's/:/\\:/g')
+          sed -i "s|^distributionUrl=.*|distributionUrl=$escaped|" "$props"
+          grep distributionUrl "$props"
+
       - name: Build release APK
         run: |
           set -e
