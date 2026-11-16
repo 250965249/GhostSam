@@ -3,7 +3,7 @@
 
 Every ksud variant derives its version from git *inside* build.rs:
 
-    SukiSU-Ultra     VERSION_CODE = 40000 - 2815 + `git rev-list --count HEAD`
+    SukiSU-Ultra     VERSION_CODE = 30000 - 4001 + `git rev-list --count HEAD`
     KernelSU-Next    VERSION_CODE = 30000 + `git rev-list --count HEAD`
     BakaSU           VERSION_CODE = 30000 + 700 + `git rev-list --count HEAD`
     KernelSU         VERSION_CODE = 20000 + `git rev-list --count HEAD`
@@ -34,8 +34,10 @@ from pathlib import Path
 ELF_MAGIC = b"\x7fELF"
 
 #: Per-project `VERSION_CODE` offset, copied from each project's build.rs.
+#: SukiSU renamed itself to SukiSU-Nova and changed the formula from
+#: 40000-2815 to 30000-4001 in the same commit; keep them in sync.
 VERSION_CODE_OFFSETS = {
-    "sukisu": 40000 - 2815,
+    "sukisu": 30000 - 4001,
     "next": 30000,
     "bakasu": 30000 + 700,
     "default": 20000,

@@ -88,11 +88,18 @@ def changes_section(lock: dict, previous: dict | None) -> list[str]:
         if c_code == o_code and c.get('version_name') == o.get('version_name'):
             continue
         delta = ""
+        note = ""
         if isinstance(c_code, int) and isinstance(o_code, int) and c_code != o_code:
-            delta = f" {c_code - o_code:+d}"
+            step = c_code - o_code
+            if step < -1000:
+                # e.g. SukiSU renamed itself to SukiSU-Nova and restarted the
+                # numbering, so a plain delta would read as a huge downgrade.
+                note = "（上游更换了版本号规则）"
+            else:
+                delta = f" {step:+d}"
         lines.append(
             f"| {LABEL.get(name, name)} | `{o.get('version_name')}` ({o_code}) → "
-            f"`{c.get('version_name')}` ({c_code}) {delta} |"
+            f"`{c.get('version_name')}` ({c_code}) {delta}{note} |"
         )
         changed += 1
     if changed == 0:
