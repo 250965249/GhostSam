@@ -119,23 +119,46 @@ def managers_section(managers_dir: Path) -> list[str]:
         ]
         for entry in info:
             size_mb = entry.get("size", 0) / (1024 * 1024)
+            kind = entry.get("kind") or "release"
+            source = entry.get("repo")
+            if kind == "nightly":
+                source = f"{source} · CI 产物"
+            tag = entry.get("tag")
+            if entry.get("apk_version"):
+                tag = f"{tag} / {entry['apk_version']}"
             lines.append(
-                f"| {entry.get('display')} | `{entry.get('repo')}` "
-                f"| `{entry.get('tag')}` | `{entry.get('file')}` | {size_mb:.1f} MB |"
+                f"| {entry.get('display')} | `{source}` "
+                f"| `{tag}` | `{entry.get('file')}` | {size_mb:.1f} MB |"
             )
         lines.append("")
         lines.append(
-            "管理器直接取自上游 release，与上面的 ksud 版本一一对应，签名用的是各项目自己的证书。"
+            "管理器取自各自项目的发布渠道，签名用的是各项目自己的证书，"
+            "与 GhostSam 无关。"
         )
-        fallbacks = [e for e in info if e.get("match") not in (None, "exact")]
-        if fallbacks:
-            lines.append("")
-            for entry in fallbacks:
-                lines.append(
-                    f"- ⚠️ {entry.get('display')}：没找到与 ksud "
-                    f"`{entry.get('ksud_version')}` 完全对应的 release，退回最新的 "
-                    f"`{entry.get('tag')}`"
+        notes = []
+        for entry in info:
+            match = entry.get("match")
+            kind = entry.get("kind") or "release"
+            name = entry.get("display")
+            if kind == "nightly" or str(match).startswith("nightly"):
+                notes.append(
+                    f"{name}：取自上游 `build-manager` 工作流的最新 CI 产物"
+                    f"（nightly.link），不是正式 release"
                 )
+            elif kind == "carry-over" or match == "carried-over":
+                notes.append(
+                    f"⚠️ {name}：上游已没有可下载的管理器产物（release 被删除、"
+                    f"Actions 产物也无法公开获取），本次沿用 `{entry.get('tag')}` "
+                    f"里的管理器，版本可能落后于当前 ksud"
+                )
+            elif match not in (None, "exact"):
+                notes.append(
+                    f"⚠️ {name}：没找到与 ksud `{entry.get('ksud_version')}` "
+                    f"完全对应的 release，退回 `{entry.get('tag')}`"
+                )
+        if notes:
+            lines.append("")
+            lines.extend(f"- {n}" for n in notes)
         return lines
 
     apks = sorted(p for p in managers_dir.rglob("*.apk"))
