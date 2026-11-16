@@ -16,6 +16,7 @@
     <string name="home_status_ksu_enabled">%1$s 已启用</string>
     <string name="home_status_ksu_enabled_detail">点击打开管理器</string>
     <string name="home_status_ksu_enabled_detail_version">点击打开管理器 · %1$s</string>
+    <string name="home_status_ksu_stale_manager_detail">管理器是在内核加载之后安装/更新的，导致它看不到内核——重新加载一次即可</string>
     <string name="home_status_noksu_enabled">临时 root 通道</string>
     <string name="home_status_noksu_enabled_detail">KernelSU 未加载 · socket 通道生效至重启</string>
     <string name="home_status_standalone">就绪</string>

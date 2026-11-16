@@ -258,6 +258,26 @@ object KernelSuProbe {
         return isManagerInstalled(context)
     }
 
+    /**
+     * The kernel records which app is "the manager" once, while it loads
+     * (`track_throne`), and only a manager in that list sees the kernel as
+     * installed. Replacing the manager afterwards (a new signature, a different
+     * apk) leaves the running kernel pointing at the old uid, so the module is
+     * loaded - [isActive] says so - while the manager itself reports "未安装".
+     *
+     * Package update times are wall clock, so compare them against the wall
+     * clock of this boot instead of storing our own timestamp.
+     */
+    fun managerInstalledAfterLoad(context: Context): Boolean {
+        val bootWallClock = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
+        return managerPackageCandidates(context).any { pkg ->
+            runCatching {
+                val info = context.packageManager.getPackageInfo(pkg, 0)
+                maxOf(info.lastUpdateTime, info.firstInstallTime) > bootWallClock
+            }.getOrDefault(false)
+        }
+    }
+
     private fun launchIntentVisible(context: Context, pkg: String): Boolean = runCatching {
         context.packageManager.getLaunchIntentForPackage(pkg) != null
     }.getOrDefault(false)

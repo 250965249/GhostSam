@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.snothin.ghostsam.R
 import com.snothin.ghostsam.data.device.DeviceSnapshot
+import com.snothin.ghostsam.data.device.KernelSuProbe
 import com.snothin.ghostsam.data.channel.SelinuxState
 import com.snothin.ghostsam.data.device.SeriesMatch
 import com.snothin.ghostsam.data.device.SeriesTable
@@ -110,10 +111,16 @@ private fun summonStatusUi(
         StatusColors.success(isDark),
         SuccessAccent,
         titleOverride = stringResource(R.string.home_status_ksu_enabled, ksuManagerLabel()),
-        detailOverride = stringResource(
-            R.string.home_status_ksu_enabled_detail_version,
-            ksudPayloadVersionLabel(),
-        ),
+        // A manager installed after the module loaded never reached the kernel's
+        // manager list, so its own UI says "未安装" while the module runs fine.
+        detailOverride = if (KernelSuProbe.managerInstalledAfterLoad(LocalContext.current)) {
+            stringResource(R.string.home_status_ksu_stale_manager_detail)
+        } else {
+            stringResource(
+                R.string.home_status_ksu_enabled_detail_version,
+                ksudPayloadVersionLabel(),
+            )
+        },
     )
 
     SummonStatus.Working -> SummonStatusUi(

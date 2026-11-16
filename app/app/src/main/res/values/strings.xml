@@ -16,6 +16,7 @@
     <string name="home_status_ksu_enabled">%1$s enabled</string>
     <string name="home_status_ksu_enabled_detail">Tap to open manager</string>
     <string name="home_status_ksu_enabled_detail_version">Tap to open manager · %1$s</string>
+    <string name="home_status_ksu_stale_manager_detail">Manager was installed after the kernel loaded, so it cannot see it - load again to register</string>
     <string name="home_status_noksu_enabled">Temporary root channel</string>
     <string name="home_status_noksu_enabled_detail">KernelSU not loaded · socket channel active until reboot</string>
     <string name="home_status_standalone">Ready</string>
