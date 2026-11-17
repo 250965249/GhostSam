@@ -3,15 +3,20 @@
 
 Sources differ per project:
 
-  sukisu  the official release that matches the ksud version. Take the version
-          name from the sidecar (`4.3.0-r2-17-g...`), strip the `-<n>-g<sha>`
-          describe suffix, and look for tag `v4.3.0-r2`.
-  bakasu  BakaSU no longer publishes a usable manager in its releases; the
-          manager is built by its `build-manager` workflow on `main` and exposed
-          by nightly.link as a zip:
+  sukisu  SukiSU-Ultra renamed itself to SukiSU-Nova and deleted every release,
+          so the manager only exists as the `Manager` artifact of its
+          build-manager workflow on `main`:
+          https://nightly.link/SukiSU-Nova/SukiSU-Nova/workflows/build-manager/main/Manager.zip
+          It is signed with the key GhostSam already pins (947ae944...).
+  bakasu  BakaSU no longer publishes a usable manager in its releases either;
+          the manager is built by its `build-manager` workflow on `main` and
+          exposed by nightly.link as a zip:
           https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/Manager-release.zip
           Take the arm64-v8a APK out of that zip (universal as fallback), and
           fall back to the release APK if nightly.link is unavailable.
+
+Anything that still cannot be resolved carries the manager from the previous
+GhostSam release forward, so a release never ships without one.
 
 Requires GH_TOKEN in the environment (the workflow's GITHUB_TOKEN is enough).
 
@@ -38,13 +43,29 @@ NIGHTLY_BAKASU = (
     "https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/"
     "Manager-release.zip"
 )
+NIGHTLY_SUKISU = (
+    "https://nightly.link/SukiSU-Nova/SukiSU-Nova/workflows/build-manager/main/"
+    "Manager.zip"
+)
 
 SPEC: dict[str, dict] = {
     "sukisu": {
-        "kind": "release",
-        "repo": "SukiSU-Ultra/SukiSU-Ultra",
+        # SukiSU-Ultra renamed itself to SukiSU-Nova and deleted every release,
+        # so the manager only exists as the `Manager` artifact of its
+        # build-manager workflow. Signed with the same key as before
+        # (947ae944...), so nothing else has to change.
+        "kind": "nightly",
+        "repo": "SukiSU-Nova/SukiSU-Nova",
+        "url": NIGHTLY_SUKISU,
         "out": "GhostSam-manager-SukiSU.apk",
         "display": "SukiSU-Ultra",
+        "prefer": [
+            re.compile(r"-universal-release\.apk$"),
+            re.compile(r"(?<!spoofed)-release\.apk$"),
+            re.compile(r"-arm64-v8a-release\.apk$"),
+            re.compile(r"\.apk$"),
+        ],
+        "release_repo": "SukiSU-Nova/SukiSU-Nova",
     },
     "bakasu": {
         "kind": "nightly",
