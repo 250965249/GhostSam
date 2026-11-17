@@ -158,10 +158,15 @@ def managers_section(managers_dir: Path) -> list[str]:
                     f"Actions 产物也无法公开获取），本次沿用 `{entry.get('tag')}` "
                     f"里的管理器，版本可能落后于当前 ksud"
                 )
+            elif match == "newest-stable":
+                notes.append(
+                    f"{name}：取上游最新的正式 release `{entry.get('tag')}`"
+                    f"（上游已改用新的版本号规则，不再与 ksud 版本一一对应）"
+                )
             elif match not in (None, "exact"):
                 notes.append(
-                    f"⚠️ {name}：没找到与 ksud `{entry.get('ksud_version')}` "
-                    f"完全对应的 release，退回 `{entry.get('tag')}`"
+                    f"⚠️ {name}：没找到可用的正式 release，退回 "
+                    f"`{entry.get('tag')}`（没有正式版可用了，请留意）"
                 )
         if notes:
             lines.append("")
