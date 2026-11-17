@@ -21,7 +21,11 @@ object KernelSuProbe {
 
     private const val PACKAGE_KERNELSU_NEXT = "com.rifsxd.ksunext"
 
-    private const val PACKAGE_SUKISU = "com.sukisu.ultra"
+    /** SukiSU-Ultra renamed to SukiSU-Nova; the app id followed (com.sukisu.nova). */
+    private const val PACKAGE_SUKISU = "com.sukisu.nova"
+
+    /** Pre-rename SukiSU manager, still recognised so an older install keeps working. */
+    private const val PACKAGE_SUKISU_LEGACY = "com.sukisu.ultra"
 
     private const val PACKAGE_BAKASU = "com.resukisu.resukisu"
 
@@ -227,8 +231,7 @@ object KernelSuProbe {
                 if (PACKAGE_KERNELSU_NEXT in ksuNextCertPackages) ksuNextCertPackages
                 else ksuNextCertPackages + PACKAGE_KERNELSU_NEXT
             KsudVariant.SukiSU ->
-                if (PACKAGE_SUKISU in sukisuCertPackages) sukisuCertPackages
-                else sukisuCertPackages + PACKAGE_SUKISU
+                (sukisuCertPackages + PACKAGE_SUKISU + PACKAGE_SUKISU_LEGACY).distinct()
             KsudVariant.BakaSU ->
                 if (PACKAGE_BAKASU in bakasuCertPackages) bakasuCertPackages
                 else bakasuCertPackages + PACKAGE_BAKASU

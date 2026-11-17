@@ -43,29 +43,23 @@ NIGHTLY_BAKASU = (
     "https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/"
     "Manager-release.zip"
 )
-NIGHTLY_SUKISU = (
-    "https://nightly.link/SukiSU-Nova/SukiSU-Nova/workflows/build-manager/main/"
-    "Manager.zip"
-)
 
 SPEC: dict[str, dict] = {
     "sukisu": {
-        # SukiSU-Ultra renamed itself to SukiSU-Nova and deleted every release,
-        # so the manager only exists as the `Manager` artifact of its
-        # build-manager workflow. Signed with the same key as before
-        # (947ae944...), so nothing else has to change.
-        "kind": "nightly",
+        # SukiSU-Ultra renamed itself to SukiSU-Nova and restarted its versioning
+        # (tag v3.0.0, manager 30000), so the ksud describe string no longer maps
+        # onto a tag - take the newest release that carries a manager APK. Still
+        # signed with the key GhostSam pins (947ae944...), but the app id moved
+        # from com.sukisu.ultra to com.sukisu.nova.
+        "kind": "release",
         "repo": "SukiSU-Nova/SukiSU-Nova",
-        "url": NIGHTLY_SUKISU,
         "out": "GhostSam-manager-SukiSU.apk",
-        "display": "SukiSU-Ultra",
+        "display": "SukiSU-Nova",
         "prefer": [
             re.compile(r"-universal-release\.apk$"),
             re.compile(r"(?<!spoofed)-release\.apk$"),
-            re.compile(r"-arm64-v8a-release\.apk$"),
             re.compile(r"\.apk$"),
         ],
-        "release_repo": "SukiSU-Nova/SukiSU-Nova",
     },
     "bakasu": {
         "kind": "nightly",
@@ -122,34 +116,69 @@ def base_version(version_name: str | None) -> str | None:
     return DESCRIBE_TAIL.sub("", version_name.strip()) or None
 
 
-def pick_asset(assets: list[dict]) -> dict | None:
+def pick_asset(assets: list[dict], prefer: tuple = ASSET_ORDER) -> dict | None:
     apks = [a for a in assets if a["name"].lower().endswith(".apk")]
     apks = [a for a in apks if "spoof" not in a["name"].lower()]
     if not apks:
         return None
-    for pattern in ASSET_ORDER:
+    for pattern in prefer:
         for asset in apks:
             if pattern.search(asset["name"]):
                 return asset
     return apks[0]
 
 
-def pick_release(releases: list[dict], base: str | None) -> tuple[dict | None, str]:
-    usable = [r for r in releases if not r.get("draft")]
-    with_apk = [r for r in usable if pick_asset(r.get("assets") or [])]
+def list_releases(repo: str) -> list[dict]:
+    """Newest-first release metadata.
+
+    `gh api .../releases` comes back empty for SukiSU-Nova (the repository was
+    renamed; the collection endpoint resolves to an empty page for the old id)
+    while `gh release list` and `releases/tags/<tag>` answer normally, so go
+    through the CLI and fetch assets per tag.
+    """
+    out = gh(
+        "release", "list", "-R", repo, "--limit", "30",
+        "--json", "tagName,isPrerelease,isLatest,publishedAt",
+    )
+    return [r for r in json.loads(out) if not r.get("isDraft")]
+
+
+def release_assets(repo: str, tag: str) -> list[dict]:
+    try:
+        data = json.loads(gh("api", f"repos/{repo}/releases/tags/{tag}"))
+    except (RuntimeError, json.JSONDecodeError):
+        return []
+    return data.get("assets") or []
+
+
+def pick_release(
+    repo: str, releases: list[dict], base: str | None, prefer: tuple = ASSET_ORDER
+) -> tuple[dict | None, str, dict | None]:
+    """(release, how, asset) for the newest release that carries a manager APK."""
+    candidates: list[tuple[dict, str]] = []
 
     if base:
-        for candidate in (f"v{base}", base):
-            for release in with_apk:
-                if release["tag_name"] == candidate:
-                    return release, "exact"
+        for tag in (f"v{base}", base):
+            for release in releases:
+                if release["tagName"] == tag:
+                    candidates.append((release, "exact"))
 
-    stable = [r for r in with_apk if not r.get("prerelease")]
-    if stable:
-        return stable[0], "newest-stable"
-    if with_apk:
-        return with_apk[0], "newest"
-    return None, "none"
+    for release in releases:
+        if not release.get("isPrerelease"):
+            candidates.append((release, "newest-stable"))
+    for release in releases:
+        candidates.append((release, "newest"))
+
+    seen: set[str] = set()
+    for release, how in candidates:
+        tag = release["tagName"]
+        if tag in seen:
+            continue
+        seen.add(tag)
+        asset = pick_asset(release_assets(repo, tag), prefer)
+        if asset:
+            return release, how, asset
+    return None, "none", None
 
 
 def sha256(path: Path) -> str:
@@ -216,17 +245,16 @@ def carry_over(variant: str, spec: dict, out_dir: Path, reason: str) -> dict:
 
 def fetch_release(variant: str, spec: dict, version_name: str | None, out_dir: Path) -> dict:
     base = base_version(version_name)
-    releases = json.loads(gh("api", f"repos/{spec['repo']}/releases?per_page=30"))
-    release, how = pick_release(releases, base)
-    if not release:
+    releases = list_releases(spec["repo"])
+    prefer = tuple(spec.get("prefer") or ASSET_ORDER)
+    release, how, asset = pick_release(spec["repo"], releases, base, prefer)
+    if not release or not asset:
         raise RuntimeError(f"{spec['repo']}: no release carries an APK")
-    asset = pick_asset(release.get("assets") or [])
-    if not asset:
-        raise RuntimeError(f"{spec['repo']} {release['tag_name']}: no APK asset")
+    tag = release["tagName"]
 
     with tempfile.TemporaryDirectory() as tmp:
         gh(
-            "release", "download", release["tag_name"],
+            "release", "download", tag,
             "-R", spec["repo"],
             "--pattern", asset["name"],
             "--dir", tmp,
@@ -238,12 +266,12 @@ def fetch_release(variant: str, spec: dict, version_name: str | None, out_dir: P
         target = out_dir / spec["out"]
         shutil.move(str(downloaded), target)
 
-    print(f"{variant}: {spec['repo']} {release['tag_name']} -> {asset['name']} ({how})")
+    print(f"{variant}: {spec['repo']} {tag} -> {asset['name']} ({how})")
     return {
         "variant": variant,
         "display": spec["display"],
         "repo": spec["repo"],
-        "tag": release["tag_name"],
+        "tag": tag,
         "asset": asset["name"],
         "file": spec["out"],
         "size": target.stat().st_size,
@@ -296,16 +324,17 @@ def fetch_nightly(variant: str, spec: dict, version_name: str | None, out_dir: P
             asset = chosen
         except RuntimeError as exc:
             print(f"::warning::{variant}: {exc} - falling back to the release APK")
-            releases = json.loads(
-                gh("api", f"repos/{spec['release_repo']}/releases?per_page=30")
+            rel, how2, picked = pick_release(
+                spec["release_repo"],
+                list_releases(spec["release_repo"]),
+                base_version(version_name),
+                tuple(spec.get("prefer") or ASSET_ORDER),
             )
-            rel, how2 = pick_release(releases, base_version(version_name))
-            if not rel:
+            if not rel or not picked:
                 raise RuntimeError(f"{variant}: neither nightly.link nor a release had an APK")
-            picked = pick_asset(rel.get("assets") or [])
             with tempfile.TemporaryDirectory() as tmp2:
                 gh(
-                    "release", "download", rel["tag_name"],
+                    "release", "download", rel["tagName"],
                     "-R", spec["release_repo"],
                     "--pattern", picked["name"],
                     "--dir", tmp2,
