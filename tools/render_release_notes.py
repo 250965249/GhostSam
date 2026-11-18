@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 
 ORDER = ["sukisu", "bakasu", "next", "default"]
@@ -87,16 +88,19 @@ def changes_section(lock: dict, previous: dict | None) -> list[str]:
         # commit changes the binary hash but not the version, and that is noise.
         if c_code == o_code and c.get('version_name') == o.get('version_name'):
             continue
+        def base_of(value: str | None) -> str:
+            return re.sub(r"-\d+-g[0-9a-f]{7,40}$", "", (value or "").strip()).lstrip("v")
+
         delta = ""
         note = ""
-        if isinstance(c_code, int) and isinstance(o_code, int) and c_code != o_code:
-            step = c_code - o_code
-            if step < -1000:
-                # e.g. SukiSU renamed itself to SukiSU-Nova and restarted the
-                # numbering, so a plain delta would read as a huge downgrade.
-                note = "（上游更换了版本号规则）"
-            else:
-                delta = f" {step:+d}"
+        old_base = base_of(o.get("version_name"))
+        new_base = base_of(c.get("version_name"))
+        if old_base and new_base and old_base != new_base:
+            # SukiSU renamed itself to SukiSU-Nova and restarted versioning, so a
+            # plain delta would read as a downgrade of the same line.
+            note = f"（版本基准 {old_base} → {new_base}）"
+        elif isinstance(c_code, int) and isinstance(o_code, int) and c_code != o_code:
+            delta = f" {c_code - o_code:+d}"
         lines.append(
             f"| {LABEL.get(name, name)} | `{o.get('version_name')}` ({o_code}) → "
             f"`{c.get('version_name')}` ({c_code}) {delta}{note} |"
