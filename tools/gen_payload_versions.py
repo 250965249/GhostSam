@@ -60,9 +60,9 @@ VARIANTS: dict[str, dict[str, str]] = {
     },
     "sukisu": {
         "file": "ksud-sukisu",
-        "display": "SukiSU-Ultra",
-        "source": "250965249/SukiSU-Ultra",
-        "release_tag": "latest-ksud",
+        "display": "SukiSU-Nova",
+        "source": "SukiSU-Nova/SukiSU-Nova",
+        "release_tag": "latest",
     },
     "bakasu": {
         "file": "ksud-bakasu",
@@ -99,7 +99,7 @@ def read_sidecar(path: Path) -> dict[str, str]:
 
 
 def format_label(display: str, name: str | None, code: int | None, sidecar: dict) -> str:
-    """`SukiSU-Ultra v4.3.0 (41128)` / `SukiSU-Ultra v4.3.0+44 (41128)`.
+    """`SukiSU-Nova v3.0.0 (30000)` / `SukiSU-Nova v3.0.0+3 (30003)`.
 
     A variant whose `userspace/ksud/build.rs` pins the stamp (KernelSU-Next)
     gets a `pinned` marker, because otherwise the number would silently look
@@ -188,7 +188,10 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
                     f"{spec['source']} - the scheduled sync has not caught up"
                 )
             built_at = sidecar.get("built_at")
-            if built_at:
+            # An official release is a finished artefact: it is not rebuilt
+            # every day, so its publish date must not read as a stalled build.
+            official = sidecar.get("source") == "official-release"
+            if built_at and not official:
                 try:
                     ts = datetime.strptime(built_at, "%Y-%m-%dT%H:%M:%SZ").replace(
                         tzinfo=timezone.utc
