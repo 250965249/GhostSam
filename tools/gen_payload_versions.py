@@ -31,6 +31,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -116,6 +117,10 @@ def format_label(display: str, name: str | None, code: int | None, sidecar: dict
     # tags before running `git describe`.
     candidate = (sidecar.get("version_name") or "").strip() or name or ""
     if not candidate or is_polluted(candidate):
+        return f"{display} ({code}{marker})"
+    # A build whose tree carries no version tag describes itself as a bare commit
+    # sha; that is not a version, so show the code only rather than 26750f0.
+    if re.fullmatch(r"[0-9a-f]{7,40}", candidate):
         return f"{display} ({code}{marker})"
 
     parsed = parse_describe(candidate)
