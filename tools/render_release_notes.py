@@ -58,6 +58,10 @@ def variant_rows(lock: dict) -> list[str]:
             continue
         label = LABEL.get(name, name)
         version = entry.get("version_name") or "unknown"
+        # A tree without a reachable version tag describes itself as a bare sha;
+        # that is not a version and reads as noise in the table.
+        if re.fullmatch(r"[0-9a-f]{7,40}", str(version)):
+            version = "—"
         pinned = " (版本钉死)" if entry.get("version_pinned") else ""
         rows.append(
             f"| {label} | `{version}`{pinned} | {entry.get('version_code')} "
