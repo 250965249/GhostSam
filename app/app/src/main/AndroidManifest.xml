@@ -8,6 +8,11 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
      <!-- POST_NOTIFICATIONS: RemoteInput pairing-code entry (Android 13+ runtime permission) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+     <!-- Restart the root manager after late-load: the bundled BakaSU ksud
+          launches `com.resukisu.resukisu.dev`, so the real manager keeps a stale
+          kernel fd until its process is stopped. su/debug-shell are often absent
+          on the standalone route; this normal permission is the fallback. -->
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
      <!-- Pairing foreground service (connectedDevice type)  -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
