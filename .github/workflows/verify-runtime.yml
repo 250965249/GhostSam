@@ -29,9 +29,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - name: Install Android toolchain
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0 ndk;30.0.16248370'
+          log-accepted-android-sdk-licenses: true
+      - name: Align Android toolchain with the runner
         run: |
-          sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;30.0.16248370'
+          set -euo pipefail
           sed -i 's/compileSdk = 37/compileSdk = 36/' app/app/build.gradle.kts
           sed -i 's/ndkVersion = "30.0.15729638"/ndkVersion = "30.0.16248370"/' app/app/build.gradle.kts
       - name: Compile APK and run unit tests

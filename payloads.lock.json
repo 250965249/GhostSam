@@ -1,34 +1,30 @@
 {
-  "generated_at": "2026-11-01T08:12:31Z",
+  "generated_at": "2026-11-21T01:58:44Z",
   "payloads_dir": "app\\app\\src\\main\\assets\\payloads\\ksud",
   "problems": [
-    "next: no ksud-next.version published by 250965249/KernelSU-Next-Samsung - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified",
-    "sukisu: version_name 'latest-ksud' came from a fork release tag and no producer sidecar supplies the real one - the producer's ksud build ran `git describe` with `latest-ksud` present",
-    "sukisu: no ksud-sukisu.version published by 250965249/SukiSU-Ultra - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified",
-    "bakasu: version_name 'latest-ksud-1-gb8f9d24f' came from a fork release tag and no producer sidecar supplies the real one - the producer's ksud build ran `git describe` with `latest-ksud` present",
-    "bakasu: no ksud-bakasu.version published by 250965249/BakaSU - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified"
+    "next: no ksud-next.version published by 250965249/KernelSU-Next-Samsung - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified"
   ],
   "variants": {
     "bakasu": {
-      "behind_upstream": null,
-      "built_at": null,
-      "commit": "b8f9d24f",
-      "commit_count": 4560,
+      "behind_upstream": 0,
+      "built_at": "2026-11-20T23:33:07Z",
+      "commit": "16d627fdb331d9e1fb48c01640deefda5ba1381f",
+      "commit_count": 4591,
       "display": "BakaSU",
-      "distance": 1,
-      "elf_version_name": "latest-ksud-1-gb8f9d24f",
+      "distance": 120,
+      "elf_version_name": "4.2.0-rc3-120-g16d627fd",
       "file": "ksud-bakasu",
-      "git_version_name": null,
-      "label": "BakaSU (35260)",
-      "sha256": "1bf67afa6f423d87d2c88ebbf5e4ec4d2c3228ee437de13e2652a3a49c693a50",
-      "size": 5928128,
+      "git_version_name": "4.2.0-rc3-120-g16d627fd",
+      "label": "BakaSU v4.2.0-rc3+120 (35291)",
+      "sha256": "d58c513f1c86436d8f9076dfa4db2f7001a9eaf25ede94c9aaab3a42d11c355b",
+      "size": 5947064,
       "source": "250965249/BakaSU",
-      "tag": "latest-ksud",
-      "upstream_commit": null,
-      "upstream_version_name": null,
+      "tag": "4.2.0-rc3",
+      "upstream_commit": "7b65bde0",
+      "upstream_version_name": "4.2.0-rc3-91-g7b65bde0",
       "variant": "bakasu",
-      "version_code": 35260,
-      "version_name": "latest-ksud-1-gb8f9d24f",
+      "version_code": 35291,
+      "version_name": "4.2.0-rc3-120-g16d627fd",
       "version_pinned": false
     },
     "default": {
@@ -76,27 +72,29 @@
       "version_pinned": false
     },
     "sukisu": {
-      "behind_upstream": null,
-      "built_at": null,
-      "commit": null,
-      "commit_count": 3921,
-      "display": "SukiSU-Ultra",
-      "distance": 0,
-      "elf_version_name": "latest-ksud",
+      "behind_upstream": 0,
+      "built_at": "2026-11-19T01:26:46Z",
+      "commit": "200225b6d1842bdd7ca3a576ffe7296399bb5a42",
+      "commit_count": 9047,
+      "display": "SukiSU-Nova",
+      "distance": 85,
+      "elf_version_name": "4.3.0-r2-85-g200225b6",
       "file": "ksud-sukisu",
-      "git_version_name": null,
-      "label": "SukiSU-Ultra (41106)",
-      "sha256": "f2d04f72ceb0371c7247de37050e4a2ce889cf9654c3cbe4b0521123e77f7ec7",
-      "size": 7811984,
+      "git_version_name": "4.3.0-r2-85-g200225b6",
+      "label": "SukiSU-Nova v4.3.0-r2+85 (35046)",
+      "sha256": "f94fb60a5c2bb58929505583cc477e59d31b8f8079b7a0ac0a286470cdb60ade",
+      "size": 8057784,
       "source": "250965249/SukiSU-Ultra",
-      "tag": "latest-ksud",
-      "upstream_commit": null,
-      "upstream_version_name": null,
+      "tag": "4.3.0-r2",
+      "upstream_commit": "1439545f",
+      "upstream_version_name": "manager-ci-7-g1439545f",
       "variant": "sukisu",
-      "version_code": 41106,
-      "version_name": "latest-ksud",
+      "version_code": 35046,
+      "version_name": "4.3.0-r2-85-g200225b6",
       "version_pinned": false
     }
   },
-  "warnings": []
+  "warnings": [
+    "sukisu: payload built 2.0d ago (> 48h), upstream producer looks stalled"
+  ]
 }

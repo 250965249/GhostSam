@@ -335,14 +335,11 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  # The two root managers ride along with every GhostSam build. They are built
-  # from the producer sources and signed with the GhostSam keystore on purpose:
-  # KernelSuProbe.kt pins BAKASU_MANAGER_CERT_SHA256 to that certificate, so a
-  # manager signed any other way is treated as "not installed".
-  # The two root managers ride along with every GhostSam build. They are NOT
-  # rebuilt here: each project already publishes a signed manager with every
-  # release, so we pull the release whose tag matches the ksud we are shipping
-  # (ksud 4.3.0-r2-17-g... -> SukiSU-Ultra v4.3.0-r2).
+  # The two producer-signed root managers ride along with every GhostSam build.
+  # KernelSuProbe.kt pins each producer certificate, so a manager signed with a
+  # different key is rejected before an exploit starts. SukiSU is pinned to the
+  # Nova v3.0.0 release by tools/fetch_managers.py; BakaSU uses its current
+  # workflow artifact with the same certificate and UAPI family as ksud.
   managers:
     needs: sync
     runs-on: ubuntu-latest
