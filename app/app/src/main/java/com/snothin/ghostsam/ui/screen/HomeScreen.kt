@@ -387,6 +387,7 @@ private fun HomeMiuix(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val status = when {
+                ksuActive && !managerInstalled -> SummonStatus.ManagerMissing
                 ksuActive -> SummonStatus.Ready
                 exploiting -> SummonStatus.Working
                 standaloneReady && !managerInstalled -> SummonStatus.ManagerMissing
