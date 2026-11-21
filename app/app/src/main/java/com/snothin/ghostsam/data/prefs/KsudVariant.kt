@@ -13,7 +13,7 @@ enum class KsudVariant {
         get() = when (this) {
             Default -> "KernelSU"
             Next -> "KernelSU-Next"
-            SukiSU -> "SukiSU-Ultra"
+            SukiSU -> "SukiSU-Nova"
             BakaSU -> "BakaSU"
         }
 

@@ -3,14 +3,11 @@
 
 Sources differ per project:
 
-  sukisu  SukiSU-Ultra renamed itself to SukiSU-Nova and deleted every release,
-          so the manager only exists as the `Manager` artifact of its
-          build-manager workflow on `main`:
-          https://nightly.link/SukiSU-Nova/SukiSU-Nova/workflows/build-manager/main/Manager.zip
-          It is signed with the key GhostSam already pins (947ae944...).
-  bakasu  BakaSU no longer publishes a usable manager in its releases either;
-          the manager is built by its `build-manager` workflow on `main` and
-          exposed by nightly.link as a zip:
+  sukisu  SukiSU-Nova v3.0.0 is pinned because the Samsung ksud producer and
+          this manager share the tested UAPI. Never silently advance to a future
+          release whose UAPI may require a newer kernel.
+  bakasu  BakaSU is built by its `build-manager` workflow and exposed by
+          nightly.link as a zip:
           https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/Manager-release.zip
           Take the arm64-v8a APK out of that zip (universal as fallback), and
           fall back to the release APK if nightly.link is unavailable.
@@ -46,11 +43,10 @@ NIGHTLY_BAKASU = (
 
 SPEC: dict[str, dict] = {
     "sukisu": {
-        # SukiSU-Ultra renamed itself to SukiSU-Nova and restarted its versioning
-        # (tag v3.0.0, manager 30000), so the ksud describe string no longer maps
-        # onto a tag - take the newest release that carries a manager APK. Still
-        # signed with the key GhostSam pins (947ae944...), but the app id moved
-        # from com.sukisu.ultra to com.sukisu.nova.
+        # This manager shares its UAPI with the Samsung producer. The producer's
+        # git describe still uses an Ultra tag, so do not infer a Nova release
+        # from that tag or silently advance the manager to a future UAPI.
+        "pinned_tag": "v3.0.0",
         "kind": "release",
         "repo": "SukiSU-Nova/SukiSU-Nova",
         "out": "GhostSam-manager-SukiSU.apk",
@@ -152,9 +148,15 @@ def release_assets(repo: str, tag: str) -> list[dict]:
 
 
 def pick_release(
-    repo: str, releases: list[dict], base: str | None, prefer: tuple = ASSET_ORDER
+    repo: str, releases: list[dict], base: str | None, prefer: tuple = ASSET_ORDER,
+    *, pinned_tag: str | None = None,
 ) -> tuple[dict | None, str, dict | None]:
-    """(release, how, asset) for the newest release that carries a manager APK."""
+    """Select a compatible APK; an explicit pin must never fall back to another tag."""
+    if pinned_tag:
+        asset = pick_asset(release_assets(repo, pinned_tag), prefer)
+        if asset:
+            return {"tagName": pinned_tag}, "exact", asset
+        return None, "none", None
     candidates: list[tuple[dict, str]] = []
 
     if base:
@@ -245,9 +247,11 @@ def carry_over(variant: str, spec: dict, out_dir: Path, reason: str) -> dict:
 
 def fetch_release(variant: str, spec: dict, version_name: str | None, out_dir: Path) -> dict:
     base = base_version(version_name)
-    releases = list_releases(spec["repo"])
+    releases = [] if spec.get("pinned_tag") else list_releases(spec["repo"])
     prefer = tuple(spec.get("prefer") or ASSET_ORDER)
-    release, how, asset = pick_release(spec["repo"], releases, base, prefer)
+    release, how, asset = pick_release(
+        spec["repo"], releases, base, prefer, pinned_tag=spec.get("pinned_tag"),
+    )
     if not release or not asset:
         raise RuntimeError(f"{spec['repo']}: no release carries an APK")
     tag = release["tagName"]
@@ -383,6 +387,13 @@ def main(argv: list[str]) -> int:
             else:
                 report.append(fetch_release(variant, spec, version_name, args.out))
         except (RuntimeError, json.JSONDecodeError) as exc:
+            # A pinned manager is part of the compatibility contract. Carrying
+            # over an arbitrary older APK would make the ksud/manager pair
+            # unknowable, so fail the managers job and publish nothing for it.
+            if spec.get("pinned_tag"):
+                print(f"::error::{variant}: {exc}", file=sys.stderr)
+                failures.append(variant)
+                continue
             try:
                 report.append(carry_over(variant, spec, args.out, str(exc)))
             except RuntimeError as exc2:

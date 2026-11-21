@@ -1,0 +1,55 @@
+name: Verify runtime compatibility
+
+on:
+  pull_request:
+    branches: [bakasu]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Test payload and manager selection
+        run: python3 -m unittest discover -s tools/tests -v
+      - name: Verify embedded payload versions
+        run: python3 tools/verify_embedded_version.py app/app/src/main/assets/payloads/ksud
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-36 build-tools;36.0.0 ndk;30.0.16248370'
+          log-accepted-android-sdk-licenses: true
+      - name: Align Android toolchain with the runner
+        run: |
+          set -euo pipefail
+          sed -i 's/compileSdk = 37/compileSdk = 36/' app/app/build.gradle.kts
+          sed -i 's/ndkVersion = "30.0.15729638"/ndkVersion = "30.0.16248370"/' app/app/build.gradle.kts
+      - name: Compile APK and run unit tests
+        working-directory: app
+        run: |
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest assembleDebug --no-daemon --stacktrace \
+            -Pandroid.experimental.disableCompileSdkChecks=true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ghostsam-runtime-verification
+          path: |
+            app/app/build/outputs/apk/debug/*.apk
+            app/app/build/reports/tests/
+          if-no-files-found: warn

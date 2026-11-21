@@ -88,9 +88,8 @@ internal class HomeEvidence internal constructor(
         val suReady = withContext(Dispatchers.IO) { SuController.isAvailable() }
         suAvailable = suReady
         suProbeDone = true
-        if (!ksuActive) {
-            ksuActive = suReady
-        }
+        // `su` answering is not KernelSU evidence: a temporary root channel can
+        // also provide it. Module evidence below decides whether KSU is active.
         if (suReady) moduleActive = true
         // File probes are unreliable on Samsung builds: once the channel is up, verify the module
         // via shell uid + su uid=0.

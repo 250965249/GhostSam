@@ -111,9 +111,8 @@ private fun summonStatusUi(
         StatusColors.success(isDark),
         SuccessAccent,
         titleOverride = stringResource(R.string.home_status_ksu_enabled, ksuManagerLabel()),
-        // A manager installed after the module loaded never reached the kernel's
-        // manager list, so its own UI says "未安装" while the module runs fine.
-        detailOverride = if (KernelSuProbe.managerInstalledAfterLoad(LocalContext.current)) {
+        // Install timestamps cannot establish the ordering relative to loading.
+        detailOverride = if (KernelSuProbe.managerChangedThisBoot(LocalContext.current)) {
             stringResource(R.string.home_status_ksu_stale_manager_detail)
         } else {
             stringResource(

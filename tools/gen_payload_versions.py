@@ -62,8 +62,8 @@ VARIANTS: dict[str, dict[str, str]] = {
     "sukisu": {
         "file": "ksud-sukisu",
         "display": "SukiSU-Nova",
-        "source": "SukiSU-Nova/SukiSU-Nova",
-        "release_tag": "latest",
+        "source": "250965249/SukiSU-Ultra",
+        "release_tag": "latest-ksud",
     },
     "bakasu": {
         "file": "ksud-bakasu",
