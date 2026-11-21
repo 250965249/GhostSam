@@ -65,12 +65,6 @@ VARIANTS: dict[str, dict[str, str]] = {
         "source": "250965249/SukiSU-Ultra",
         "release_tag": "latest-ksud",
     },
-    "bakasu": {
-        "file": "ksud-bakasu",
-        "display": "BakaSU",
-        "source": "250965249/BakaSU",
-        "release_tag": "latest-ksud",
-    },
 }
 
 MANIFEST_NAME = "versions.properties"

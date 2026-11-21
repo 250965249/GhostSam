@@ -5,7 +5,6 @@ Every ksud variant derives its version from git *inside* build.rs:
 
     SukiSU-Ultra     VERSION_CODE = 30000 - 4001 + `git rev-list --count HEAD`
     KernelSU-Next    VERSION_CODE = 30000 + `git rev-list --count HEAD`
-    BakaSU           VERSION_CODE = 30000 + 700 + `git rev-list --count HEAD`
     KernelSU         VERSION_CODE = 20000 + `git rev-list --count HEAD`
 
     VERSION_NAME = `git describe --tags --always`  (leading 'v' stripped)
@@ -39,7 +38,6 @@ ELF_MAGIC = b"\x7fELF"
 VERSION_CODE_OFFSETS = {
     "sukisu": 30000 - 4001,
     "next": 30000,
-    "bakasu": 30000 + 700,
     "default": 20000,
 }
 

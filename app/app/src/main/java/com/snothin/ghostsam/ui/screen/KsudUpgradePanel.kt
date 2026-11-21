@@ -46,7 +46,6 @@ import com.snothin.ghostsam.data.channel.ExecutionMode
 import com.snothin.ghostsam.data.channel.ExploitChannel
 import com.snothin.ghostsam.data.channel.SuDaemonChannel
 import com.snothin.ghostsam.data.device.KernelSuProbe
-import com.snothin.ghostsam.data.device.ManagerRestart
 import com.snothin.ghostsam.ui.component.AutoScrollToBottom
 import com.snothin.ghostsam.ui.component.LogText
 import kotlinx.coroutines.CoroutineScope
@@ -295,9 +294,6 @@ internal class KsudUpgradeState(
                 }
                 log(if (ok) "[+] module verified" else "[-] module not detected")
                 if (ok) {
-                    // The bundled BakaSU ksud's compiled default package ends in
-                    // `.dev`; restart the real manager so it reconnects.
-                    ManagerRestart.restart(context)
                     finalizeKsudUpgrade()
                 } else {
                     ksudLoadFailed = true

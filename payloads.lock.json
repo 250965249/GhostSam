@@ -1,32 +1,10 @@
 {
-  "generated_at": "2026-11-21T01:58:44Z",
+  "generated_at": "2026-11-21T03:51:00Z",
   "payloads_dir": "app\\app\\src\\main\\assets\\payloads\\ksud",
   "problems": [
     "next: no ksud-next.version published by 250965249/KernelSU-Next-Samsung - the producer's auto-sync-build workflow has not run since the sidecar was introduced (check that Actions is enabled on that repo), so neither the version name nor the upstream distance can be verified"
   ],
   "variants": {
-    "bakasu": {
-      "behind_upstream": 0,
-      "built_at": "2026-11-20T23:33:07Z",
-      "commit": "16d627fdb331d9e1fb48c01640deefda5ba1381f",
-      "commit_count": 4591,
-      "display": "BakaSU",
-      "distance": 120,
-      "elf_version_name": "4.2.0-rc3-120-g16d627fd",
-      "file": "ksud-bakasu",
-      "git_version_name": "4.2.0-rc3-120-g16d627fd",
-      "label": "BakaSU v4.2.0-rc3+120 (35291)",
-      "sha256": "d58c513f1c86436d8f9076dfa4db2f7001a9eaf25ede94c9aaab3a42d11c355b",
-      "size": 5947064,
-      "source": "250965249/BakaSU",
-      "tag": "4.2.0-rc3",
-      "upstream_commit": "7b65bde0",
-      "upstream_version_name": "4.2.0-rc3-91-g7b65bde0",
-      "variant": "bakasu",
-      "version_code": 35291,
-      "version_name": "4.2.0-rc3-120-g16d627fd",
-      "version_pinned": false
-    },
     "default": {
       "behind_upstream": null,
       "built_at": null,
@@ -95,6 +73,6 @@
     }
   },
   "warnings": [
-    "sukisu: payload built 2.0d ago (> 48h), upstream producer looks stalled"
+    "sukisu: payload built 2.1d ago (> 48h), upstream producer looks stalled"
   ]
 }

@@ -14,8 +14,7 @@ internal object PayloadVersions {
     private val fallback: Map<KsudVariant, String> = mapOf(
         KsudVariant.Default to "KernelSU (bundled)",
         KsudVariant.Next to "KernelSU-Next (bundled)",
-        KsudVariant.SukiSU to "SukiSU-Ultra (bundled)",
-        KsudVariant.BakaSU to "BakaSU (bundled)",
+        KsudVariant.SukiSU to "SukiSU-Nova (bundled)",
     )
 
     fun label(context: Context, variant: KsudVariant): String = runCatching {
