@@ -19,7 +19,6 @@ from probe_payload_version import probe
 
 PRODUCERS = {
     "sukisu": "250965249/SukiSU-Ultra",
-    "bakasu": "250965249/BakaSU",
 }
 
 

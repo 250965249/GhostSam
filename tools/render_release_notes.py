@@ -23,10 +23,9 @@ import json
 import re
 from pathlib import Path
 
-ORDER = ["sukisu", "bakasu", "next", "default"]
+ORDER = ["sukisu", "next", "default"]
 LABEL = {
     "sukisu": "SukiSU-Nova",
-    "bakasu": "BakaSU",
     "next": "KernelSU-Next",
     "default": "KernelSU (official)",
 }

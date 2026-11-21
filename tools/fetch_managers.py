@@ -6,11 +6,6 @@ Sources differ per project:
   sukisu  SukiSU-Nova v3.0.0 is pinned because the Samsung ksud producer and
           this manager share the tested UAPI. Never silently advance to a future
           release whose UAPI may require a newer kernel.
-  bakasu  BakaSU is built by its `build-manager` workflow and exposed by
-          nightly.link as a zip:
-          https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/Manager-release.zip
-          Take the arm64-v8a APK out of that zip (universal as fallback), and
-          fall back to the release APK if nightly.link is unavailable.
 
 Anything that still cannot be resolved carries the manager from the previous
 GhostSam release forward, so a release never ships without one.
@@ -36,11 +31,6 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-NIGHTLY_BAKASU = (
-    "https://nightly.link/Baka-SU/BakaSU/workflows/build-manager/main/"
-    "Manager-release.zip"
-)
-
 SPEC: dict[str, dict] = {
     "sukisu": {
         # This manager shares its UAPI with the Samsung producer. The producer's
@@ -56,19 +46,6 @@ SPEC: dict[str, dict] = {
             re.compile(r"(?<!spoofed)-release\.apk$"),
             re.compile(r"\.apk$"),
         ],
-    },
-    "bakasu": {
-        "kind": "nightly",
-        "repo": "Baka-SU/BakaSU",
-        "url": NIGHTLY_BAKASU,
-        "out": "GhostSam-manager-BakaSU.apk",
-        "display": "BakaSU",
-        "prefer": [
-            re.compile(r"-arm64-v8a-release\.apk$"),
-            re.compile(r"-universal-release\.apk$"),
-            re.compile(r"(?<!spoofed)-release\.apk$"),
-        ],
-        "release_repo": "Baka-SU/BakaSU",
     },
 }
 

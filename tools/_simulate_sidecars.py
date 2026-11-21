@@ -18,13 +18,6 @@ SIDECARS = {
         "upstream_commit": "0fe8d052",
         "upstream_version_name": "4.3.0-20-g0fe8d052",
     },
-    "bakasu": {
-        "version_code": "35260",
-        "version_name": "4.2.0-4-gb8f9d24f",
-        "behind_upstream": "0",
-        "upstream_commit": "deadbeef",
-        "upstream_version_name": "4.2.0",
-    },
 }
 
 
@@ -39,7 +32,7 @@ def main(argv):
     out.mkdir(parents=True)
 
     now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    for name in ("ksud", "ksud-next", "ksud-sukisu", "ksud-bakasu"):
+    for name in ("ksud", "ksud-next", "ksud-sukisu"):
         shutil.copy(src / name, out / name)
 
     for variant, kv in SIDECARS.items():

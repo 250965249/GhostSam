@@ -33,7 +33,6 @@ VARIANTS = {
     "ksud": "default",
     "ksud-next": "next",
     "ksud-sukisu": "sukisu",
-    "ksud-bakasu": "bakasu",
 }
 
 
