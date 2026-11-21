@@ -13,10 +13,10 @@
     <string name="home_status_manager_missing_detail">执行 exploit 前请先安装 %1$s Manager</string>
     <string name="home_status_su_denied">未授予本工具 su 权限</string>
     <string name="home_status_su_denied_detail">打开管理器授权（用于 SELinux 切换、系统工具）</string>
-    <string name="home_status_ksu_enabled">%1$s 已启用</string>
-    <string name="home_status_ksu_enabled_detail">点击打开管理器</string>
-    <string name="home_status_ksu_enabled_detail_version">点击打开管理器 · %1$s</string>
-    <string name="home_status_ksu_stale_manager_detail">本次开机安装或更新过管理器。若管理器显示未安装，请先重启设备，再启用对应版本</string>
+    <string name="home_status_ksu_enabled">%1$s 连接待确认</string>
+    <string name="home_status_ksu_enabled_detail">请在管理器中查看连接状态</string>
+    <string name="home_status_ksu_enabled_detail_version">请在管理器中确认 · %1$s</string>
+    <string name="home_status_ksu_stale_manager_detail">本次开机安装或更新过管理器。若仍显示未安装，请保存日志，不要重复启用</string>
     <string name="home_status_noksu_enabled">临时 root 通道</string>
     <string name="home_status_noksu_enabled_detail">KernelSU 未加载 · socket 通道生效至重启</string>
     <string name="home_status_standalone">就绪</string>
@@ -378,7 +378,7 @@
     <string name="exploit_log_fail_timeout">exploit 总超时 %1$ds</string>
     <string name="exploit_log_fail_verify">KernelSU 验证超时（模块未加载或 su 无应答）</string>
     <string name="exploit_log_verify_wait">验证中：模块未加载 / su 不可用（%1$ds）</string>
-    <string name="exploit_log_verified">已检测到 KernelSU 模块或 su 通道，请在对应管理器中确认连接状态</string>
+    <string name="exploit_log_verified">GhostSam 流程已结束，未验证管理器连接</string>
     <string name="exploit_log_verified_noksu">临时 root 通道验证通过（permissive 会话）</string>
     <string name="exploit_log_noksu_hint">第三方终端（Termux 等）可用 /data/local/tmp/cve-2026-43499-root（-c 单条 / 无参交互）</string>
     <string name="exploit_log_completed">完成，耗时 %1$.1fs · exit 0</string>
