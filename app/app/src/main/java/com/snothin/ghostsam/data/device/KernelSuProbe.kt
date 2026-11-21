@@ -146,7 +146,7 @@ object KernelSuProbe {
         val variant = SettingsPrefs.effectiveKsudVariant(context)
         val expectedHash = certHash(variant) ?: return
         loadCache(context)
-        if (managerPackageCandidates(context).any { launchIntentVisible(context, it) }) return
+        if (isManagerInstalled(context)) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - certScanAt < CERT_SCAN_TTL_MS) return
         certScanAt = now
@@ -240,7 +240,13 @@ object KernelSuProbe {
 
     fun preferredManagerPackage(context: Context): String {
         val candidates = managerPackageCandidates(context)
-        return candidates.firstOrNull { launchIntentVisible(context, it) } ?: candidates.first()
+        return candidates.firstOrNull { managerUsable(context, it) } ?: candidates.first()
+    }
+
+    private fun managerUsable(context: Context, pkg: String): Boolean {
+        if (!launchIntentVisible(context, pkg)) return false
+        val expected = certHash(SettingsPrefs.effectiveKsudVariant(context)) ?: return true
+        return certMatched(context.packageManager, pkg, expected) != null
     }
 
     /** Rooted but su denied: rooted = this-boot receipt or module fallback; denied = SuController.isAvailable
@@ -252,8 +258,10 @@ object KernelSuProbe {
         return (token != null && ExploitPrefs.isReceiptVerified(context, token)) || isActive()
     }
 
+    /** A matching package name alone is insufficient: the kernel authenticates
+     * the manager certificate as well. Check known and cached packages alike. */
     fun isManagerInstalled(context: Context): Boolean =
-        managerPackageCandidates(context).any { launchIntentVisible(context, it) }
+        managerPackageCandidates(context).any { managerUsable(context, it) }
 
     fun probeManagerInstalled(context: Context): Boolean {
         if (isManagerInstalled(context)) return true
@@ -261,17 +269,10 @@ object KernelSuProbe {
         return isManagerInstalled(context)
     }
 
-    /**
-     * The kernel records which app is "the manager" once, while it loads
-     * (`track_throne`), and only a manager in that list sees the kernel as
-     * installed. Replacing the manager afterwards (a new signature, a different
-     * apk) leaves the running kernel pointing at the old uid, so the module is
-     * loaded - [isActive] says so - while the manager itself reports "未安装".
-     *
-     * Package update times are wall clock, so compare them against the wall
-     * clock of this boot instead of storing our own timestamp.
-     */
-    fun managerInstalledAfterLoad(context: Context): Boolean {
+    /** Package timestamps only establish a change during this boot, not whether
+     * it happened before or after module loading. A changed manager may need a
+     * reboot to refresh registration; never suggest loading the module twice. */
+    fun managerChangedThisBoot(context: Context): Boolean {
         val bootWallClock = System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime()
         return managerPackageCandidates(context).any { pkg ->
             runCatching {

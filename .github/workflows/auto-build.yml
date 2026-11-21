@@ -144,16 +144,11 @@ jobs:
                    ksud-aarch64-linux-android "$base/ksud"
           fetch_gh 250965249/KernelSU-Next-Samsung latest-ksud \
                    ksud-next-aarch64 "$base/ksud-next"
-          # SukiSU renamed itself to SukiSU-Nova and restarted its versioning.
-          # Its own release already carries a ksud with every KMI's LKM embedded,
-          # so ship that instead of rebuilding our fork: the label and the
-          # "behind upstream" figure then follow the official release instead of
-          # the stale v4.3.0-r2 tag the fork still has.
-          nova_tag=$(gh release view -R SukiSU-Nova/SukiSU-Nova --json tagName --jq .tagName)
-          nova_built=$(gh release view -R SukiSU-Nova/SukiSU-Nova --json publishedAt --jq .publishedAt)
-          echo "SukiSU-Nova release: $nova_tag ($nova_built)"
-          fetch_gh SukiSU-Nova/SukiSU-Nova "$nova_tag" \
-                   ksud-aarch64-linux-android "$base/ksud-sukisu"
+          # ksud embeds the kernel modules. Samsung requires the adapted modules
+          # from the samsung producer; an official Nova binary is not a substitute
+          # even when its version label is newer.
+          fetch_gh 250965249/SukiSU-Ultra latest-ksud \
+                   ksud-sukisu-aarch64 "$base/ksud-sukisu"
           fetch_gh 250965249/BakaSU latest-ksud \
                    ksud-bakasu-aarch64 "$base/ksud-bakasu"
 
@@ -170,25 +165,7 @@ jobs:
             fi
           }
           sidecar next   250965249/KernelSU-Next-Samsung
-          # SukiSU-Nova ships a finished ksud, so there is no producer sidecar:
-          # synthesise one from the release itself. behind_upstream is 0 because
-          # this file *is* the upstream artefact.
-          nova_json=$(python3 tools/probe_payload_version.py "$base/ksud-sukisu" --variant sukisu --json)
-          nova_code=$(printf '%s' "$nova_json" | python3 -c 'import json,sys;print(json.load(sys.stdin)["version_code"])')
-          nova_name=$(printf '%s' "$nova_json" | python3 -c 'import json,sys;print(json.load(sys.stdin)["version_name"])')
-          {
-            echo "variant=sukisu"
-            echo "source=official-release"
-            echo "release_tag=$nova_tag"
-            echo "version_code=$nova_code"
-            echo "version_name=$nova_name"
-            echo "git_version_name=$nova_tag"
-            echo "behind_upstream=0"
-            echo "version_pinned=false"
-            echo "built_at=$nova_built"
-            echo "sha256=$(sha256sum "$base/ksud-sukisu" | cut -d' ' -f1)"
-          } > "$side/ksud-sukisu.version"
-          echo "sidecar: sukisu synthesised from SukiSU-Nova $nova_tag (code $nova_code, name $nova_name)"
+          sidecar sukisu 250965249/SukiSU-Ultra
           sidecar bakasu 250965249/BakaSU
 
           # A plain `file`-style check is not available on every runner image, so
@@ -204,6 +181,11 @@ jobs:
             echo "$f: ${size} bytes"
           done
           sha256sum "$base/ksud" "$base/ksud-next" "$base/ksud-sukisu" "$base/ksud-bakasu"
+
+      - name: Verify Samsung payload provenance
+        run: |
+          python3 tools/verify_samsung_payloads.py \
+            --payloads "$PAYLOAD_DIR" --sidecars "$SIDECAR_DIR"
 
       - name: Regenerate payload version manifest
         id: manifest

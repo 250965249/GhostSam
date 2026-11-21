@@ -26,5 +26,6 @@ exploit/build/
 *.o
 
 #  Local scratch 
+.repair/
 tmp/
 *.log

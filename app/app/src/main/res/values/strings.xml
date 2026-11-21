@@ -16,7 +16,7 @@
     <string name="home_status_ksu_enabled">%1$s enabled</string>
     <string name="home_status_ksu_enabled_detail">Tap to open manager</string>
     <string name="home_status_ksu_enabled_detail_version">Tap to open manager · %1$s</string>
-    <string name="home_status_ksu_stale_manager_detail">Manager was installed after the kernel loaded, so it cannot see it - load again to register</string>
+    <string name="home_status_ksu_stale_manager_detail">Manager installed or updated during this boot. If it reports not installed, reboot first, then enable the matching variant</string>
     <string name="home_status_noksu_enabled">Temporary root channel</string>
     <string name="home_status_noksu_enabled_detail">KernelSU not loaded · socket channel active until reboot</string>
     <string name="home_status_standalone">Ready</string>
@@ -300,6 +300,7 @@
 
     <string name="exploit_fail_shizuku">No privileged channel (wireless debugging not connected / Shizuku not granted)</string>
     <string name="exploit_fail_manager_missing">KernelSU Manager is not installed, install it before running</string>
+    <string name="exploit_fail_manager_variant">%1$s manager is missing or its signing certificate does not match (%2$s). Install the matching manager before enabling</string>
     <string name="exploit_fail_already_root">Root already granted, exploit not needed</string>
     <string name="exploit_fail_boot_claimed">Exploit already ran on this boot, reboot to retry</string>
     <string name="exploit_fail_uptime">Boot time below the minimum uptime</string>
@@ -377,7 +378,7 @@
     <string name="exploit_log_fail_timeout">Exploit timed out after %1$ds</string>
     <string name="exploit_log_fail_verify">KernelSU verification timed out (module not loaded or su silent)</string>
     <string name="exploit_log_verify_wait">verifying: module not loaded / su unavailable (%1$ds)</string>
-    <string name="exploit_log_verified">KernelSU verified (uid=0)</string>
+    <string name="exploit_log_verified">KernelSU module or su channel detected; confirm the connection in the matching manager</string>
     <string name="exploit_log_verified_noksu">Temp root channel verified (permissive session)</string>
     <string name="exploit_log_noksu_hint">3rd-party terminals (Termux…): /data/local/tmp/cve-2026-43499-root (-c cmd / interactive)</string>
     <string name="exploit_log_completed">Completed in %1$.1fs · exit 0</string>
