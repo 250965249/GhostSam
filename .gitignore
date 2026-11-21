@@ -30,3 +30,4 @@ exploit/build/
 payloads-sidecars/
 tmp/
 *.log
+/.tmp*
