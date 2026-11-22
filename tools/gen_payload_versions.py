@@ -13,8 +13,9 @@ This script is the single source of truth. For every payload it:
      (see tools/probe_payload_version.py);
   2. cross-checks that stamp against the optional `*.version` sidecar that the
      ksud producer repository publishes next to the binary;
-  3. fails loudly when the two disagree, when a fork release tag polluted
-     `git describe`, or when the payload is older than `--max-age-hours`.
+  3. reports an identity failure when the two disagree or a fork release tag
+     polluted `git describe`; age above `--max-age-hours` is only a warning,
+     because an unchanged upstream does not require a daily rebuild.
 
 Usage:
     python3 tools/gen_payload_versions.py --payloads <dir> [--sidecars <dir>]
@@ -224,6 +225,16 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
             else None,
             "upstream_commit": sidecar.get("upstream_commit"),
             "upstream_version_name": sidecar.get("upstream_version_name"),
+            # Optional producer receipt fields. Never infer a kernel version
+            # from the ksud stamp or call a generic official build Samsung-ready.
+            "kernel_version_code": sidecar.get("kernel_version_code"),
+            "kernel_uapi_version": sidecar.get("kernel_uapi_version"),
+            "build_kind": sidecar.get("build_kind"),
+            "producer_run_id": sidecar.get("producer_run_id"),
+            "producer_artifact_id": sidecar.get("producer_artifact_id"),
+            "producer_artifact_digest": sidecar.get("producer_artifact_digest"),
+            "official_ci_commit": sidecar.get("official_ci_commit"),
+            "merge_auto_resolved": sidecar.get("merge_auto_resolved"),
             "size": info["size"],
             "sha256": digest,
             "label": format_label(

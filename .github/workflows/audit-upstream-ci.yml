@@ -8,6 +8,12 @@ on:
       - 'tools/fetch_managers.py'
       - 'tools/audit_upstream_ci.py'
       - 'tools/verify_manager_apks.py'
+      - 'tools/verify_manager_pairing.py'
+      - 'tools/gen_payload_versions.py'
+      - 'tools/probe_payload_version.py'
+      - 'payloads.lock.json'
+      - 'app/app/src/main/assets/payloads/ksud/**'
+      - '.github/workflows/auto-build.yml'
       - 'tools/tests/**'
       - '.github/workflows/audit-upstream-ci.yml'
   workflow_dispatch:
@@ -47,6 +53,22 @@ jobs:
           python3 tools/verify_manager_apks.py --managers ci-managers \
             --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
             --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2"
+      - name: Verify live Nova pairing using a non-runnable payload archive
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          trap 'rm -f pairing-fixture.zip' EXIT
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          source = Path('app/app/src/main/assets/payloads/ksud/ksud-sukisu')
+          with ZipFile('pairing-fixture.zip', 'w') as archive:
+              archive.write(source, 'assets/payloads/ksud/ksud-sukisu')
+          PY
+          python3 tools/verify_manager_pairing.py --only sukisu \
+            --lock payloads.lock.json --apk pairing-fixture.zip \
+            --managers ci-managers --out ci-managers/manager-pairing.json
       - name: Compare existing Samsung source baselines with official CI
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

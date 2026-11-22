@@ -36,7 +36,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from github_ci import provenance, resolve_ci
+from github_ci import full_revision, provenance, resolve_ci
 
 SPEC: dict[str, dict] = {
     "default": {
@@ -270,6 +270,8 @@ def fetch_release(variant: str, spec: dict, version_name: str | None, out_dir: P
     if not release or not asset:
         raise RuntimeError(f"{spec['repo']}: no release carries an APK")
     tag = release["tagName"]
+    revision = release_revision(spec["repo"], tag)
+    uapi = source_uapi(spec["repo"], revision)
 
     with tempfile.TemporaryDirectory() as tmp:
         gh(
@@ -300,11 +302,28 @@ def fetch_release(variant: str, spec: dict, version_name: str | None, out_dir: P
         "url": asset.get("browser_download_url"),
         "kind": "release",
         "apk_version": apk_label(asset["name"]),
+        "source_commit": revision,
+        "uapi_version": uapi,
+        "pairing": "not-verified",
     }
 
 
 def api_json(path: str) -> dict:
     return json.loads(gh("api", path))
+
+
+def release_revision(repository: str, tag: str, api=None) -> str:
+    api = api or api_json
+    data = api(f"repos/{repository}/git/ref/tags/{tag}")
+    obj = data.get("object") or {}
+    for _ in range(8):
+        sha = full_revision(obj.get("sha"))
+        if obj.get("type") == "commit":
+            return sha
+        if obj.get("type") != "tag":
+            raise RuntimeError("release tag does not identify a Git commit")
+        obj = (api(f"repos/{repository}/git/tags/{sha}").get("object") or {})
+    raise RuntimeError("release tag chain exceeds the verification limit")
 
 
 def parse_uapi(text: str) -> int:
@@ -327,9 +346,10 @@ def source_uapi(repository: str, revision: str) -> int:
     return parse_uapi(base64.b64decode(data["content"]).decode("utf-8"))
 
 
-def fetch_ci(variant: str, spec: dict, version_name: str | None, out_dir: Path) -> dict:
+def fetch_ci(variant: str, spec: dict, version_name: str | None, out_dir: Path, *, expected_revision: str | None = None) -> dict:
     run, artifact = resolve_ci(
         api_json, spec["repo"], spec["branch"], spec["workflow"], spec["artifact"],
+        expected_revision=expected_revision,
     )
     target = out_dir / spec["out"]
     # Download exactly the audited artifact ID, not a mutable run/name URL.
@@ -453,10 +473,20 @@ def fetch_nightly(variant: str, spec: dict, version_name: str | None, out_dir: P
 def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sidecars", type=Path, default=Path("payloads-sidecars"))
+    ap.add_argument("--payload-lock", type=Path, help="use the exact APK build's shared contract, not a fresh sidecar download")
     ap.add_argument("--out", type=Path, default=Path("managers"))
     ap.add_argument("--only", choices=sorted(SPEC), action="append")
     args = ap.parse_args(argv)
 
+    contract = None
+    if args.payload_lock is not None:
+        try:
+            contract = json.loads(args.payload_lock.read_text(encoding="utf-8"))
+            if not isinstance(contract, dict) or not isinstance(contract.get("variants"), dict):
+                raise ValueError("payload lock must be an object containing a variants object")
+        except (OSError, ValueError) as exc:
+            print(f"::error::invalid shared payload contract: {exc}", file=sys.stderr)
+            return 1
     args.out.mkdir(parents=True, exist_ok=True)
     report: list[dict] = []
     failures: list[str] = []
@@ -464,10 +494,20 @@ def main(argv: list[str]) -> int:
     for variant, spec in SPEC.items():
         if args.only and variant not in args.only:
             continue
-        version_name = read_version_name(args.sidecars, variant)
         try:
+            if contract is not None:
+                entry = contract.get("variants", {}).get(variant)
+                if not isinstance(entry, dict):
+                    raise RuntimeError(f"{variant}: shared APK build contract is missing")
+                version_name = entry.get("version_name")
+                expected_revision = entry.get("official_ci_commit")
+                if spec["kind"] == "ci" and expected_revision is None:
+                    raise RuntimeError(f"{variant}: shared contract has no official CI snapshot; refusing an unrelated latest manager")
+            else:
+                version_name = read_version_name(args.sidecars, variant)
+                expected_revision = None
             if spec["kind"] == "ci":
-                report.append(fetch_ci(variant, spec, version_name, args.out))
+                report.append(fetch_ci(variant, spec, version_name, args.out, expected_revision=expected_revision))
             elif spec["kind"] == "nightly":
                 report.append(fetch_nightly(variant, spec, version_name, args.out))
             else:

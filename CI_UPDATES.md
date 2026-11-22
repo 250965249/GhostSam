@@ -42,6 +42,12 @@
 
 把新管理器放进正式 Release 前，仍需对应三星生产产物的不可变源码、真实内核版本/UAPI、构建身份与 SHA-256，以及独立兼容性验证。本次没有移植内核代码，不能把“最新版候选 APK 已下载”称为“最新版三星适配已完成”。
 
+新增 [verify_manager_pairing.py](<tools/verify_manager_pairing.py>) 在发布前检查：原始管理器验签状态、包名和指纹；APK 内实际 ARM64 payload 的 SHA；准确的管理器源码 commit；内核源码 UAPI 与祖先关系。新 KernelSU / Next 配套还必须给出 `build_kind=samsung-ci`、`kernel_version_code`、`kernel_uapi_version`、`official_ci_commit`、`producer_run_id`、`producer_artifact_id` 和 `producer_artifact_digest`。生产运行必须来自 `samsung` 分支的 `auto-sync-build.yml`，已经成功结束；artifact 的 ID、名称、run、SHA 和 archive digest 全部绑定，ZIP 内唯一 ksud 的 SHA 必须等于 APK 内的 payload。当前不存在已验证的 UAPI 6 配套产物，不能凭填写这些字段就宣称移植完成。
+
+发布流程冻结同一 GhostSam commit；管理器作业等待 APK 构建并使用它的同一份 lock，而不再次拉取移动的 sidecar。签名、配套、缺件、版本和 SHA 错误均在发布前阻断；`allow_stale_payloads` 只允许跳过明确的上游提交落后，不允许跳过完整性错误。超过 48 小时只警告，不能仅凭年龄判断未同步。完整资产先上传到 draft，再公开；失败 draft 不会阻止当天的 scheduled catch-up。
+
+新配套检查输出的 `contract_verified=true` 是构建契约验证，`runtime_compatibility` 始终为 `not-tested`。审计工作流只用一个不可安装的 payload ZIP 验证现有 Nova 的实文件 hash / 来源 / 接口关系，不假冒真机测试，也不创建 Release。
+
 ## 可运行的只读检查
 
 ```bash
