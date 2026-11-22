@@ -196,3 +196,70 @@ complying with applicable law.
 
 Apache-2.0 - see [LICENSE](LICENSE). Third-party notices and
 acknowledgements are in [NOTICE](NOTICE).
+
+---
+
+## Fork Build & Maintenance (maintained by 250965249)
+
+> This section documents the fork's self-built three-variant Samsung producer chains and the GhostSam consumer side, as a self-contained long-term maintenance reference. The upstream snothin project description above is left unchanged.
+
+### 1. Four repositories and the daily schedule
+
+The fork splits "Samsung-adapted kernel builds" from "APK packaging" into a producer / consumer split: three producers each merge upstream and emit reusable payloads; GhostSam only consumes and packages.
+
+| Role | Repository | Branch | Synced upstream (baseline example) | Current baseline example |
+| --- | --- | --- | --- | --- |
+| consumer | `250965249/GhostSam` | `bakasu` | — | consumes all three variants into the APK |
+| producer | `250965249/KernelSU-Next` | `samsung` | `KernelSU-Next/KernelSU-Next@dev` (UAPI 6) | variant=`next` |
+| producer | `250965249/KernelSU` | `samsung` | `tiann/KernelSU@main` (UAPI 6) | variant=`default` |
+| producer | `250965249/SukiSU-Ultra` | `samsung` | `SukiSU-Nova/SukiSU-Nova@main` | variant=`sukisu` |
+
+> Upstream refs above are stable example baselines; exact HEADs, version numbers and run ids are always **subject to the repository's current state** (these move fast and are not hard-coded in the docs).
+
+Daily schedule (Asia/Shanghai):
+
+- **02:00**: each of the three producers runs `auto-sync-build` — merge its upstream → 8-KMI dual-arch DDK LKM + ksuinit + aarch64 ksud → publish `latest-ksud` release (`ksud-<variant>-aarch64` + `.version` sidecar).
+- **05:00 / 09:00 / 13:00**: GhostSam `auto-build` pulls the three variants + sidecars → rebuilds `versions.properties` / `payloads.lock.json` → builds the APK → publishes an `auto-<timestamp>` release (with the three official manager APKs: KernelSU / KernelSU-Next / SukiSU).
+- The two layers are decoupled: producers only emit payloads, GhostSam only consumes. If any variant lacks a sidecar, is behind upstream, or its version stamp disagrees with the tree, the tail gate turns red after publishing instead of silently shipping a stale package.
+
+### 2. The three downstream branches
+
+| variant | Baseline (upstream) | Macro set (build-line red line) | SAMSUNG_OWNED | Notes |
+| --- | --- | --- | --- | --- |
+| `next` | official dev (UAPI 6) | `CONFIG_KSU_SAMSUNG_KDP / RKP / DEFEX / NO_PATCH_TEXT` (four macros) | 17 files (11 kernel + 6 ksud late-load) | rebuilt from official dev + snothin Samsung patch set |
+| `default` | tiann main (UAPI 6) | `CONFIG_KSU_RKP_NO_PATCH_TEXT / CONFIG_KSU_SAMSUNG_KDP / CONFIG_KSU_SAMSUNG_DEFEX` (three macros; names differ from the other two trees) | 21 files | dual LKM naming `{kmi}_kernelsu.ko` + `{kmi}-exynos_kernelsu.ko`, resolved by both late_load `KSUD_TREE=exynos` and boot-patch paths |
+| `sukisu` | SukiSU-Nova main | four macros (same as `next`) | see producer CI | `selinux_hide` five-point kprobe |
+
+- **Macro names are a red line**: the vanilla tree spells NO_PATCH_TEXT as `CONFIG_KSU_RKP_NO_PATCH_TEXT` (no `SAMSUNG_` prefix) and has no standalone `CONFIG_KSU_SAMSUNG_RKP`; the ddk build line and `kernel/Kbuild` gates must use each tree's own names. Copying the other trees silently skips `samsung_rkp.c`, making the manager report "not installed".
+- `next` / `default` must satisfy GhostSam's full samsung-ci contract; `sukisu` goes through a release special case, with device regression covered in section 5.
+
+### 3. Samsung adaptation methodology
+
+- **Three Knox defenses**: KDP (memory holding `cred` and similar sensitive structures is EL2-protected; use Samsung-safe memory / read-only pass-through interfaces), RKP (monitors kernel text and page tables, forbids runtime writes to read-only code; a violation triggers an EL2 panic/reboot), DEFEX (kernel whitelist blocks direct execution of files/modules under `/data`; stage into `/dev` or memfd). These map to the KDP / RKP / DEFEX / NO_PATCH_TEXT macros.
+- **`NO_PATCH_TEXT` rule**: under Samsung RKP every `ksu_patch_text` / `ksu_lsm_hook` surface returns `-EOPNOTSUPP`. Each patch point must either find a kprobe replacement or be explicitly disabled and documented (e.g. `mount_hide` stays disabled, matching the historical baseline).
+- **selinux_hide five points**: `context` / `access` / `setprocattr` / `status` / `inode_setxattr`, each with its own `samsung_*_kprobe`. **Single-point failure degradation principle**: a failed kprobe registration at any point only `pr_err`s and degrades that point — never a global `unhook`. 2026-11 lesson: upstream added the `inode_setxattr` hide surface with no Samsung channel, and a last-step failure once tore down all four already-installed points, fully disabling SELinux hide and getting caught by detection tools.
+- **init.c order**: `ksu_init_symbol_resolver()` → `ksu_samsung_kdp_init()` → `prepare_creds()` (rollback on failure) → `ksu_samsung_defex_init()` → upstream-added init calls (e.g. `ksu_selinux_inode_init` / `ksu_preinit_init`); exit is symmetric.
+- **LKM embedded at build time**: the kernel module is packed into the `ksud` binary by RustEmbed/`include_bytes!` during build; updating the LKM requires rebuilding `ksud`, not just swapping the `.ko`.
+- **Regression rule**: whenever upstream adds a hide surface (a new `ksu_patch_text` / `ksu_lsm_hook` call site), a Samsung channel or an explicit decision must be added and recorded in the audit table.
+
+### 4. Maintenance quick reference
+
+Version formulas (**dynamically grep `userspace/ksud/build.rs`; never hard-code**, upstream changed them several times):
+
+| variant | Formula | Notes |
+| --- | --- | --- |
+| `next` | `VERSION_CODE = 30000 + git rev-list --count HEAD` | |
+| `default` | `VERSION_CODE = 30000 + git rev-list --count HEAD` | |
+| `sukisu` | `VERSION_CODE = 30996 + git rev-list --count HEAD` | `30000 + 996` in build.rs |
+
+- **Version authority** is the `KSU_NO_NEW_PRIVS<5-digit code><name>` stamp in the binary's `.rodata`; `versions.properties` is generated by reading it back and cross-checked against the sidecar, failing on any mismatch.
+- **Sidecar contract**: `.version` carries `build_kind=samsung-ci`, `kernel_version_code`, `kernel_uapi_version`, `official_ci_commit` (official CI commit, 40 hex, used to lock the official manager), `producer_run_id`, `producer_artifact_id`, `producer_artifact_digest`, plus `behind_upstream`; the kernel UAPI must equal the official manager's.
+- **Conflict handling**: inside the `SAMSUNG_OWNED` whitelist, `git merge -X ours` runs automatically; outside it, the run goes red; if `merge_auto_resolved` touches any `kernel/` path, GhostSam rejects that day's product for the variant (a safety design — kernel conflicts must not be silent), requiring a manual three-way merge and re-dispatch.
+- **Fork schedule gotcha**: Actions permission enabled ≠ schedule activated; a fork's scheduled workflow usually needs the owner to click the Enable banner once on the Actions page, otherwise cron stays silent.
+- **Known pitfalls**: `GITHUB_TOKEN` lacks workflows permission so it cannot push tags/workflows; `git fetch --tags` overrides the refspec and re-imports non-v tags (polluting `git describe --tags`); `actions/checkout` must use `ref: ${{ github.ref_name }}`, not `github.sha` (otherwise it builds the previous round's tree); `gh release upload --clobber` has a 422 race — delete then upload; `find … | head` trips SIGPIPE under `pipefail` — use `-print -quit`.
+
+### 5. Regression checklist and a case study
+
+After each upstream sync, verify: sidecar `behind_upstream=0`, binary version stamp matching the tree, the LKM artifact carrying Samsung strings (KDP/DEFEX/RKP sucompat/selinux_hide), and the `selinux_hide` five-point product-level check (5 `samsung_*_kprobe` structs and registered flags actually compiled in).
+
+**Case study (41179, 2026-11)**: upstream `5b6262e8` added a fifth disguise point on `selinux_inode_setxattr`, while the Samsung fork covered only four points; the fifth still went through `ksu_lsm_hook → ksu_patch_text`, which always fails under `NO_PATCH_TEXT`, triggering a global `unhook` in `ksu_selinux_hide_enable()` — SELinux hide went fully dark and was caught by detection tools (LSPosed / SELinux leak). The fix = add the RKP kprobe channel for `inode_setxattr` + make single-point failure non-fatal, and fix the CI `manager-ci` tag pollution of `git describe`. See [CI_UPDATES.md](CI_UPDATES.md) and [PAYLOAD_SYNC_FIX.md](PAYLOAD_SYNC_FIX.md) in this repo for related background and version-sync mechanics.

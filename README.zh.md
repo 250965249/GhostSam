@@ -174,3 +174,70 @@ PR。
 ## 许可
 
 Apache-2.0，见 [`LICENSE`](LICENSE)。第三方声明与致谢见 [`NOTICE`](NOTICE)。
+
+---
+
+## 本 Fork 的构建体系与维护（250965249 维护）
+
+> 本节描述本 fork 自建的三条三星适配 producer 链与 GhostSam 消费端的完整体系，面向长线维护，自包含可独立阅读。上文为上游 snothin 项目说明，保持原样。
+
+### 1. 四仓库架构与每日时序
+
+本 fork 把「三星适配内核构建」与「APK 出包」彻底拆成 producer / consumer 两层：三个 producer 各自把官方上游合入三星补丁并产出可复用 payload，GhostSam 只负责消费与打包。
+
+| 角色 | 仓库 | 分支 | 同步上游（基线示例） | 当前基线示例 |
+| --- | --- | --- | --- | --- |
+| 消费端 | `250965249/GhostSam` | `bakasu` | — | 消费三变体产物出 APK |
+| producer | `250965249/KernelSU-Next` | `samsung` | `KernelSU-Next/KernelSU-Next@dev`（UAPI 6） | variant=`next` |
+| producer | `250965249/KernelSU` | `samsung` | `tiann/KernelSU@main`（UAPI 6） | variant=`default` |
+| producer | `250965249/SukiSU-Ultra` | `samsung` | `SukiSU-Nova/SukiSU-Nova@main` | variant=`sukisu` |
+
+> 表中上游 ref 为稳定示例基线；具体 HEAD、版本号、run id 一律**以仓库当前状态为准**（这类值变化快，不在文档写死）。
+
+每日时序（Asia/Shanghai）：
+
+- **02:00**：三个 producer 各自 `auto-sync-build` —— merge 各自官方上游 → 8-KMI 双架构 DDK LKM + ksuinit + aarch64 ksud → 发布 `latest-ksud` release（`ksud-<variant>-aarch64` + `.version` sidecar）。
+- **05:00 / 09:00 / 13:00**：GhostSam `auto-build` 拉三变体 + sidecar → 重建 `versions.properties` / `payloads.lock.json` → 打 APK → 发布 `auto-<时间戳>` release（附 KernelSU / KernelSU-Next / SukiSU 三个官方管理器 APK）。
+- 两层解耦：producer 只发 payload，GhostSam 只消费；任一变体缺 sidecar、落后上游或版本戳与树不符，出包后尾部闸门报红，绝不无声发旧包。
+
+### 2. 三条下游分支详解
+
+| variant | 基线（上游） | 宏集（构建行红线） | SAMSUNG_OWNED | 备注 |
+| --- | --- | --- | --- | --- |
+| `next` | 官方 dev（UAPI 6） | `CONFIG_KSU_SAMSUNG_KDP / RKP / DEFEX / NO_PATCH_TEXT`（四宏） | 17 文件（11 kernel + 6 ksud late-load） | 重建自官方 dev + snothin 三星补丁集 |
+| `default` | tiann main（UAPI 6） | `CONFIG_KSU_RKP_NO_PATCH_TEXT / CONFIG_KSU_SAMSUNG_KDP / CONFIG_KSU_SAMSUNG_DEFEX`（三宏，宏名与另两树不同） | 21 文件 | LKM 双命名 `{kmi}_kernelsu.ko` + `{kmi}-exynos_kernelsu.ko`，供 late_load 的 `KSUD_TREE=exynos` 与 boot patch 两路解析 |
+| `sukisu` | SukiSU-Nova main | 四宏（同 `next`） | 见 producer CI | `selinux_hide` 五点 kprobe |
+
+- **宏名是红线**：原版树的 NO_PATCH_TEXT 写作 `CONFIG_KSU_RKP_NO_PATCH_TEXT`（非 `SAMSUNG_` 前缀），且无独立 `CONFIG_KSU_SAMSUNG_RKP` 宏；ddk 构建行与 `kernel/Kbuild` 门控必须用各自那套名字，照抄另两树会静默跳过 `samsung_rkp.c`，导致管理器报「未安装」。
+- `next` / `default` 必须满足 GhostSam 的 samsung-ci 全套契约；`sukisu` 走 release 特例，真机回归见第 5 节。
+
+### 3. 三星适配方法论
+
+- **Knox 三防御**：KDP（`cred` 等敏感结构所在内存受 EL2 保护，须用三星安全内存/只读穿透接口）、RKP（监控内核 text 与页表，严禁运行时改只读代码段，违者 EL2 直接 Panic 死机重启）、DEFEX（内核白名单阻止直接执行 `/data` 下的可执行文件/模块，须 staging 到 `/dev` 或 memfd）。三者分别对应 KDP / RKP / DEFEX / NO_PATCH_TEXT 宏。
+- **`NO_PATCH_TEXT` 铁律**：三星 RKP 下所有 `ksu_patch_text` / `ksu_lsm_hook` 面恒返回 `-EOPNOTSUPP`。每一处补丁点必须找到 kprobe 替代，或显式禁用并文档化（如 `mount_hide` 维持禁用，与历史基线同等状态）。
+- **selinux_hide 五点**：`context` / `access` / `setprocattr` / `status` / `inode_setxattr` 各配一个 `samsung_*_kprobe`。**单点失败降级原则**：任一点 kprobe 注册失败只 `pr_err` 告警并降级该点，绝不整体 `unhook` —— 2026-11 事故教训：上游新增 `inode_setxattr` 隐身面而三星侧无通道，最后一步失败曾把已装好的四点一并拆除，导致 SELinux hide 全失效、被检测工具命中。
+- **init.c 顺序**：`ksu_init_symbol_resolver()` → `ksu_samsung_kdp_init()` → `prepare_creds()`（失败回滚）→ `ksu_samsung_defex_init()` → 上游新增 init 调用（如 `ksu_selinux_inode_init` / `ksu_preinit_init`）；exit 对称。
+- **LKM 编译期嵌入**：内核模块在编译 `ksud` 时由 RustEmbed/`include_bytes!` 打包进二进制，更新 LKM 必须重编 `ksud`，不能只替换 `.ko`。
+- **回归原则**：上游每次新增隐身面（新 `ksu_patch_text` / `ksu_lsm_hook` 调用点）都必须补三星通道或显式决策，并记入审计表。
+
+### 4. 维护操作速查
+
+版本公式（**动态 grep `userspace/ksud/build.rs`，禁止硬编码**，历史上游多次改过）：
+
+| variant | 公式 | 说明 |
+| --- | --- | --- |
+| `next` | `VERSION_CODE = 30000 + git rev-list --count HEAD` | |
+| `default` | `VERSION_CODE = 30000 + git rev-list --count HEAD` | |
+| `sukisu` | `VERSION_CODE = 30996 + git rev-list --count HEAD` | build.rs 中即 `30000 + 996` |
+
+- **版本权威**是二进制 `.rodata` 里的 `KSU_NO_NEW_PRIVS<5位code><name>` 戳；`versions.properties` 由探针回读生成并与 sidecar 交叉校验，不一致即报错。
+- **sidecar 契约要点**：`.version` 含 `build_kind=samsung-ci`、`kernel_version_code`、`kernel_uapi_version`、`official_ci_commit`（官方 CI commit，40 位，用于锁定官方管理器）、`producer_run_id`、`producer_artifact_id`、`producer_artifact_digest`，以及 `behind_upstream`；内核 UAPI 必须与官方管理器相等。
+- **冲突处理**：`SAMSUNG_OWNED` 白名单内自动 `git merge -X ours`；白名单外报红；若 `merge_auto_resolved` 含 `kernel/` 路径，GhostSam 拒收当天该变体产物（安全设计，kernel 冲突不许静默），需人工三方合并后重 dispatch。
+- **fork schedule 通病**：Actions 权限 enabled ≠ schedule 已激活；fork 的定时 workflow 常在 Actions 页需 owner 点一次 Enable 横幅，否则 cron 静默不跑。
+- **已知坑位**：`GITHUB_TOKEN` 无 workflows 权限，不能推 tag/workflow；`git fetch --tags` 会覆盖 refspec 重新导入非 v tag（污染 `git describe --tags`）；`actions/checkout` 必须 `ref: ${{ github.ref_name }}` 而非 `github.sha`（否则编译上一轮树）；`gh release upload --clobber` 有 422 竞态，先删后传；`find … \| head` 在 `pipefail` 下 SIGPIPE 被误判失败，用 `-print -quit`。
+
+### 5. 回归清单与案例
+
+每次上游同步后核对：sidecar `behind_upstream=0`、二进制版本戳与树一致、LKM 产物含三星字符串（KDP/DEFEX/RKP sucompat/selinux_hide）、`selinux_hide` 五点产物级验证（5 个 `samsung_*_kprobe` 与 registered 标志真实编入）。
+
+**案例（41179，2026-11）**：上游 `5b6262e8` 给 `selinux_inode_setxattr` 新增第五个伪装点，而三星 fork 只覆盖四点；第五点仍走 `ksu_lsm_hook → ksu_patch_text`，在 `NO_PATCH_TEXT` 下恒失败，触发 `ksu_selinux_hide_enable()` 整体 `unhook`，SELinux hide 全失效、被检测工具命中（LSPosed / SELinux 泄露）。修复 = 补 `inode_setxattr` 的 RKP kprobe 通道 + 把单点失败改为非致命降级，并修 CI 的 `manager-ci` tag 污染 `git describe`。相关背景与版本同步机制另见仓库内 [CI_UPDATES.md](CI_UPDATES.md) 与 [PAYLOAD_SYNC_FIX.md](PAYLOAD_SYNC_FIX.md)。
