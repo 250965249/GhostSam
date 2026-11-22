@@ -371,8 +371,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # New KernelSU/Next CI managers are audited separately until their
+          # Samsung kernels share the required UAPI and upstream source base.
           python3 tools/fetch_managers.py \
             --sidecars "${SIDECAR_DIR}" \
+            --only sukisu \
             --out managers
           ls -l managers
           cat managers/managers.json

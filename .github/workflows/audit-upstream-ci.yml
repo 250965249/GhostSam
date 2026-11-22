@@ -1,0 +1,64 @@
+name: Audit upstream CI managers
+
+on:
+  pull_request:
+    branches: [bakasu]
+    paths:
+      - 'tools/github_ci.py'
+      - 'tools/fetch_managers.py'
+      - 'tools/audit_upstream_ci.py'
+      - 'tools/verify_manager_apks.py'
+      - 'tools/tests/**'
+      - '.github/workflows/audit-upstream-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: upstream-manager-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Test source and signer identity checks
+        run: python3 -m unittest discover -s tools/tests -v
+      - name: Stage exact upstream CI manager candidates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 tools/fetch_managers.py --out ci-managers
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'build-tools;36.0.0'
+      - name: Verify original APK signatures, packages and ABI
+        run: |
+          python3 tools/verify_manager_apks.py --managers ci-managers \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2"
+      - name: Compare existing Samsung source baselines with official CI
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 tools/audit_upstream_ci.py --managers ci-managers/managers.json \
+            --out ci-managers/source-audit.json
+      - name: Record the release boundary
+        run: |
+          echo 'These are upstream manager candidates, not a Samsung-compatible release.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'No kernel is built, installed or patched by this workflow; no release is created.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: upstream-ci-manager-candidates
+          path: ci-managers/*
+          if-no-files-found: error
