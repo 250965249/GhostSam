@@ -14,6 +14,8 @@ VARIANT = "sukisu"
 CODE = 35046
 NEXT_VARIANT = "next"
 NEXT_CODE = 33000
+DEFAULT_VARIANT = "default"
+DEFAULT_CODE = 32680
 
 
 class SamsungPayloadTests(unittest.TestCase):
@@ -36,10 +38,11 @@ class SamsungPayloadTests(unittest.TestCase):
                 "sha256": hashlib.sha256(blob).hexdigest(),
             }
 
-        # verify() iterates PRODUCERS, which now covers both next and sukisu; a
-        # fixture is required for each producer or verify() reports the missing one.
+        # verify() iterates PRODUCERS, which now covers default, next and sukisu;
+        # a fixture is required for each producer or verify() reports the missing one.
         add_fixture(VARIANT, CODE, "3.0.0-1-g1234567")
         add_fixture(NEXT_VARIANT, NEXT_CODE, "3.4.2-1-g89abcde")
+        add_fixture(DEFAULT_VARIANT, DEFAULT_CODE, "3.3.1-1-gaabbccd")
 
         for mock in (
             patch.object(Path, "is_file", lambda path: path.name in self.blobs),

@@ -20,10 +20,10 @@ from github_ci import CiSourceError, full_revision
 
 BASELINES = {
     "default": {
-        "repo": "snothin/KernelSU", "branch": "samsung",
-        "anchor": "0c0fdb960178fa12d80d6cbcfdcb6ad8be6a865d",
+        "repo": "250965249/KernelSU", "branch": "samsung",
+        "anchor": "2a60b2893b8d0d885d1ceff2287d8ad854f0e0f4",
         "official": "tiann/KernelSU",
-        "produced_build": "no published CI artifact or sidecar verified",
+        "produced_build": "latest-ksud; official main + Samsung adaptation producer",
     },
     "next": {
         "repo": "250965249/KernelSU-Next", "branch": "samsung",

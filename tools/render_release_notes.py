@@ -46,6 +46,8 @@ def sync_cell(entry: dict) -> str:
     if behind == 0:
         if entry.get("source") == "250965249/KernelSU-Next":
             return "官方 dev 已同步（三星适配生产方）"
+        if entry.get("source") == "250965249/KernelSU":
+            return "官方 main 已同步（三星适配生产方）"
         return "生产方报告已同步"
     return f"落后 {behind} 个提交"
 

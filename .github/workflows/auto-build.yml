@@ -146,8 +146,10 @@ jobs:
             echo "$3 -> $4 ($(stat -c%s "$4") bytes)"
           }
 
-          fetch_gh tiann/KernelSU "" \
-                   ksud-aarch64-linux-android "$base/ksud"
+          # default now comes from the Samsung-adapted KernelSU producer (a fork of
+          # tiann/KernelSU rebased onto official main), not the official release.
+          fetch_gh 250965249/KernelSU latest-ksud \
+                   ksud-default-aarch64 "$base/ksud"
           fetch_gh 250965249/KernelSU-Next latest-ksud \
                    ksud-next-aarch64 "$base/ksud-next"
           # ksud embeds the kernel modules. Samsung requires the adapted modules
@@ -168,6 +170,7 @@ jobs:
               echo "::warning::no version sidecar for $1 ($2) - the label falls back to the code stamped in the binary"
             fi
           }
+          sidecar default 250965249/KernelSU
           sidecar next   250965249/KernelSU-Next
           sidecar sukisu 250965249/SukiSU-Ultra
 
@@ -373,13 +376,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # The official KernelSU-Next manager now ships with the Samsung-adapted
-          # next producer (they share the required UAPI and official dev source
-          # base), so it is released alongside SukiSU. The stock default manager
-          # stays audit-only.
+          # The official KernelSU-Next and KernelSU managers now ship with their
+          # Samsung-adapted producers (each shares the required UAPI and official
+          # source base of its managed kernel), so all three managers release
+          # together.
           python3 tools/fetch_managers.py \
             --payload-lock app-output/payloads.lock.json \
-            --only sukisu --only next \
+            --only sukisu --only next --only default \
             --out managers
           ls -l managers
           cat managers/managers.json
@@ -398,12 +401,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          python3 tools/verify_manager_apks.py --only sukisu --only next --managers managers \
+          python3 tools/verify_manager_apks.py --only sukisu --only next --only default --managers managers \
             --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
             --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2"
           apk=$(find app-output -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$apk"
-          python3 tools/verify_manager_pairing.py --only sukisu --only next \
+          python3 tools/verify_manager_pairing.py --only sukisu --only next --only default \
             --lock app-output/payloads.lock.json --apk "$apk" \
             --managers managers --out managers/manager-pairing.json
 
@@ -446,11 +449,12 @@ jobs:
           test -s dist/versions.properties
           test -s managers/GhostSam-manager-SukiSU.apk
           test -s managers/GhostSam-manager-KernelSU-Next.apk
+          test -s managers/GhostSam-manager-KernelSU.apk
           test -s managers/managers.json
           test -s managers/manager-pairing.json
           apk=$(find dist -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$apk"
-          python3 tools/verify_manager_pairing.py --only sukisu --only next \
+          python3 tools/verify_manager_pairing.py --only sukisu --only next --only default \
             --lock dist/payloads.lock.json --apk "$apk" \
             --managers managers --out managers/manager-pairing.json
           ( cd managers && sha256sum *.apk > ../managers.sha256 )

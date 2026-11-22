@@ -51,8 +51,8 @@ VARIANTS: dict[str, dict[str, str]] = {
     "default": {
         "file": "ksud",
         "display": "KernelSU",
-        "source": "tiann/KernelSU",
-        "release_tag": None,
+        "source": "250965249/KernelSU",
+        "release_tag": "latest-ksud",
     },
     "next": {
         "file": "ksud-next",
