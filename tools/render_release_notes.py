@@ -44,12 +44,14 @@ def sync_cell(entry: dict) -> str:
     if behind is None:
         return "n/a"
     if behind == 0:
-        return "已同步"
+        if entry.get("source") == "250965249/KernelSU-Next-Samsung":
+            return "中间仓库已同步；非官方 CI 核查"
+        return "生产方报告已同步"
     return f"落后 {behind} 个提交"
 
 
 def variant_rows(lock: dict) -> list[str]:
-    rows = ["| 变体 | 版本 | 载荷版本号 | 相对上游 CI |", "| --- | --- | --- | --- |"]
+    rows = ["| 变体 | 版本 | 载荷版本号 | 生产方同步记录 |", "| --- | --- | --- | --- |"]
     variants = lock.get("variants", {})
     for name in ORDER + [n for n in variants if n not in ORDER]:
         entry = variants.get(name)
@@ -135,7 +137,7 @@ def managers_section(managers_dir: Path) -> list[str]:
             size_mb = entry.get("size", 0) / (1024 * 1024)
             kind = entry.get("kind") or "release"
             source = entry.get("repo")
-            if kind == "nightly":
+            if kind in ("nightly", "ci"):
                 source = f"{source} · CI 产物"
             tag = entry.get("tag")
             if entry.get("apk_version"):
@@ -154,7 +156,10 @@ def managers_section(managers_dir: Path) -> list[str]:
             match = entry.get("match")
             kind = entry.get("kind") or "release"
             name = entry.get("display")
-            if kind == "nightly" or str(match).startswith("nightly"):
+            if kind == "ci":
+                ci = entry.get("ci") or {}
+                notes.append(f"{name}：官方 CI run {ci.get('run_id')}，源码 {ci.get('commit')}；不是正式 Release")
+            elif kind == "nightly" or str(match).startswith("nightly"):
                 notes.append(
                     f"{name}：取自上游 `build-manager` 工作流的最新 CI 产物"
                     f"（nightly.link），不是正式 release"

@@ -18,8 +18,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
+
+
+def blocking_problems(lock: dict) -> list[str]:
+    # Only the generator's precise lag annotation is overrideable. Missing
+    # files/sidecars, version drift and hash failures are never "stale-only".
+    lag = re.compile(r"^[a-z]+: producer is [1-9][0-9]* upstream commit\(s\) behind ")
+    return [problem for problem in lock.get("problems", []) if not lag.match(problem)]
 
 
 def behind_text(value: int | None) -> str:
@@ -75,6 +83,7 @@ def main(argv: list[str]) -> int:
     if args.github_output:
         with args.github_output.open("a", encoding="utf-8") as fh:
             fh.write(f"stale={'true' if stale else 'false'}\n")
+            fh.write(f"invalid={'true' if blocking_problems(lock) else 'false'}\n")
 
     if args.strict and stale:
         return 1

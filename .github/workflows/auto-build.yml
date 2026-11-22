@@ -64,7 +64,7 @@ jobs:
             exit 0
           fi
           today=$(date -u +%Y%m%d)
-          existing=$(gh release list -R "$GITHUB_REPOSITORY" --limit 30 \
+          existing=$(gh release list -R "$GITHUB_REPOSITORY" --exclude-drafts --limit 30 \
             --json tagName \
             --jq "[.[] | select(.tagName | startswith(\"auto-$today\"))] | .[0] // empty")
           if [ -n "${existing:-}" ]; then
@@ -79,6 +79,8 @@ jobs:
     needs: gate
     if: ${{ needs.gate.outputs.run == 'true' }}
     runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.snapshot.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -99,15 +101,20 @@ jobs:
             echo "::warning::GhostSam upstream merge has conflicts; building the current bakasu branch instead."
           fi
 
+      - name: Freeze the source commit for all build jobs
+        id: snapshot
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   build:
     needs: sync
     runs-on: ubuntu-latest
     outputs:
       stale: ${{ steps.manifest.outputs.stale }}
+      invalid: ${{ steps.manifest.outputs.invalid }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: bakasu
+          ref: ${{ needs.sync.outputs.sha }}
           fetch-depth: 0
 
       - name: Fetch latest ksud payloads
@@ -216,6 +223,18 @@ jobs:
             --lock "$LOCK_FILE" \
             --table /tmp/payload-table.md \
             --github-output "$GITHUB_OUTPUT"
+
+      - name: Reject invalid payload identity unconditionally
+        if: ${{ steps.manifest.outputs.invalid == 'true' }}
+        run: |
+          echo "::error::payload SHA, version or required metadata is invalid; the stale override cannot bypass this"
+          exit 1
+
+      - name: Reject stale payloads before building or publishing
+        if: ${{ steps.manifest.outputs.stale == 'true' && inputs.allow_stale_payloads != true }}
+        run: |
+          echo "::error::payload metadata is stale or unverified; no release will be published"
+          exit 1
 
       - name: Setup Java
         uses: actions/setup-java@v6
@@ -336,46 +355,55 @@ jobs:
   # different key is rejected before an exploit starts. SukiSU is pinned to the
   # Nova v3.0.0 release by tools/fetch_managers.py.
   managers:
-    needs: sync
+    needs: [sync, build]
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: bakasu
+          ref: ${{ needs.sync.outputs.sha }}
           fetch-depth: 1
 
-      - name: Fetch the ksud version sidecars
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          mkdir -p "${SIDECAR_DIR}"
-          sidecar() { # $1=variant $2=repo
-            local asset="ksud-$1-aarch64.version"
-            local dir
-            dir=$(mktemp -d)
-            if gh release download latest-ksud -R "$2" --pattern "$asset" --dir "$dir" --clobber 2>/dev/null; then
-              mv "$dir/$asset" "${SIDECAR_DIR}/ksud-$1.version"
-            else
-              rm -f "${SIDECAR_DIR}/ksud-$1.version"
-              echo "::warning::no sidecar for $1 - the manager is picked from the newest release instead"
-            fi
-            rm -rf "$dir"
-          }
-          sidecar sukisu 250965249/SukiSU-Ultra
-          ls -l "${SIDECAR_DIR}"
+      - uses: actions/download-artifact@v7
+        with:
+          name: ghostsam-app
+          path: app-output
 
-      - name: Download the managers that match those ksud versions
+      - name: Download the managers for the same APK build snapshot
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          # New KernelSU/Next CI managers are audited separately until their
+          # Samsung kernels share the required UAPI and upstream source base.
           python3 tools/fetch_managers.py \
-            --sidecars "${SIDECAR_DIR}" \
+            --payload-lock app-output/payloads.lock.json \
+            --only sukisu \
             --out managers
           ls -l managers
           cat managers/managers.json
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'build-tools;36.0.0'
+
+      - name: Verify signatures and the APK manager pairing before release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 tools/verify_manager_apks.py --only sukisu --managers managers \
+            --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
+            --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2"
+          apk=$(find app-output -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$apk"
+          python3 tools/verify_manager_pairing.py --only sukisu \
+            --lock app-output/payloads.lock.json --apk "$apk" \
+            --managers managers --out managers/manager-pairing.json
 
       - uses: actions/upload-artifact@v7
         with:
@@ -384,13 +412,15 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: [build, managers]
-    if: ${{ always() && needs.build.result == 'success' }}
+    needs: [sync, build, managers]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.managers.result == 'success' && needs.build.outputs.invalid != 'true' && (needs.build.outputs.stale != 'true' || inputs.allow_stale_payloads == true) }}
     runs-on: ubuntu-latest
+    env:
+      BUILD_COMMIT: ${{ needs.sync.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: bakasu
+          ref: ${{ needs.sync.outputs.sha }}
           fetch-depth: 1
 
       - name: Download the app artifacts
@@ -399,12 +429,28 @@ jobs:
           name: ghostsam-app
           path: dist
 
-      - name: Download the managers
-        continue-on-error: true
+      - name: Download the verified managers
         uses: actions/download-artifact@v7
         with:
           name: managers
           path: managers
+
+      - name: Check all release inputs before any publication
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -s dist/payloads.lock.json
+          test -s dist/versions.properties
+          test -s managers/GhostSam-manager-SukiSU.apk
+          test -s managers/managers.json
+          test -s managers/manager-pairing.json
+          apk=$(find dist -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$apk"
+          python3 tools/verify_manager_pairing.py --only sukisu \
+            --lock dist/payloads.lock.json --apk "$apk" \
+            --managers managers --out managers/manager-pairing.json
+          ( cd managers && sha256sum *.apk > ../managers.sha256 )
 
       - name: List what we have
         run: |
@@ -450,34 +496,27 @@ jobs:
           cat /tmp/release-notes.md
           cat /tmp/release-notes.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Create the release
+      - name: Stage the complete release as a draft
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          files=""
-          for f in dist/*.apk dist/checksums.txt dist/payloads.lock.json dist/versions.properties; do
-            [ -f "$f" ] && files="$files $f"
-          done
-          test -n "$files"
-          gh release create "$TAG" \
+          shopt -s nullglob
+          files=(dist/*.apk dist/checksums.txt dist/payloads.lock.json dist/versions.properties
+                 managers/*.apk managers/managers.json managers/manager-pairing.json managers.sha256)
+          for f in "${files[@]}"; do test -s "$f"; done
+          gh release create "$TAG" --draft --target "$BUILD_COMMIT" \
             --title "GhostSam ${TAG#auto-}" \
-            --notes-file /tmp/release-notes.md \
-            $files
-          echo "::notice::published $TAG"
+            --notes-file /tmp/release-notes.md "${files[@]}"
+          echo "::notice::complete draft staged for $BUILD_COMMIT"
 
-      - name: Attach the root managers
+      - name: Publish only after every asset was uploaded
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -u
-          if compgen -G "managers/*.apk" > /dev/null; then
-            ( cd managers && sha256sum *.apk > ../managers.sha256 )
-            gh release upload "$TAG" managers/*.apk managers.sha256
-            echo "::notice::attached manager APKs"
-          else
-            echo "::warning::no manager APK was built this run - the release has none"
-          fi
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --latest
+          echo "::notice::published verified complete release $TAG"
 
       - name: Move the latest-auto pointer
         env:
@@ -493,20 +532,4 @@ jobs:
             gh release edit latest-auto --notes "$notes"
           else
             gh release create latest-auto --title "GhostSam latest auto build" --notes "$notes"
-          fi
-
-      - name: Fail when a payload is behind its upstream
-        if: ${{ needs.build.outputs.stale == 'true' && inputs.allow_stale_payloads != true }}
-        run: |
-          echo "::error::at least one ksud payload is out of sync with its upstream CI build - see the notes of $TAG"
-          exit 1
-
-      - name: Fail when a root manager is missing
-        run: |
-          set -u
-          missing=""
-          [ -f "managers/GhostSam-manager-SukiSU.apk" ] || missing="$missing SukiSU"
-          if [ -n "$missing" ]; then
-            echo "::error::manager APK missing for:$missing - open the 'managers' job log; the release was still published without it"
-            exit 1
           fi
