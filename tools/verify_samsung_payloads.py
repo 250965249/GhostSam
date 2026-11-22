@@ -14,7 +14,7 @@ import re
 import sys
 from pathlib import Path
 
-from gen_payload_versions import read_sidecar
+from gen_payload_versions import VARIANTS, read_sidecar
 from probe_payload_version import probe
 
 PRODUCERS = {
@@ -27,9 +27,11 @@ PRODUCERS = {
 def verify(payloads: Path, sidecars: Path) -> list[str]:
     problems: list[str] = []
     for variant, producer in PRODUCERS.items():
-        filename = f"ksud-{variant}"
-        binary = payloads / filename
-        sidecar = read_sidecar(sidecars / f"{filename}.version")
+        # The payload file name is not always ``ksud-<variant>`` (default ships as
+        # plain ``ksud``); the sidecar always lands as ``ksud-<variant>.version``.
+        payload_file = VARIANTS[variant]["file"]
+        binary = payloads / payload_file
+        sidecar = read_sidecar(sidecars / f"ksud-{variant}.version")
         prefix = f"{variant} ({producer})"
         if not binary.is_file():
             problems.append(f"{prefix}: payload missing")

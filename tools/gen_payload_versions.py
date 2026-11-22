@@ -141,7 +141,10 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
         digest = sha256(path)
         info["sha256"] = digest
 
-        sidecar_path = sidecars / f"{spec['file']}.version"
+        # Sidecars land as ``ksud-<variant>.version`` (see auto-build.yml
+        # sidecar()), which for default differs from its payload file name
+        # ``ksud``; always key by variant, never by payload file name.
+        sidecar_path = sidecars / f"ksud-{variant}.version"
         sidecar = read_sidecar(sidecar_path)
         sidecar_name = (sidecar.get("version_name") or "").strip()
         sidecar_names_the_build = bool(sidecar_name) and not is_polluted(sidecar_name)

@@ -9,6 +9,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from verify_samsung_payloads import verify
+from gen_payload_versions import VARIANTS
 
 VARIANT = "sukisu"
 CODE = 35046
@@ -29,7 +30,9 @@ class SamsungPayloadTests(unittest.TestCase):
 
         def add_fixture(variant: str, code: int, name: str) -> None:
             blob = b"\x7fELF\x00KSU_NO_NEW_PRIVS" + str(code).encode() + name.encode() + b"\x00"
-            self.blobs[f"ksud-{variant}"] = blob
+            # Payload file is VARIANTS[variant]["file"] (default is plain "ksud");
+            # the producer sidecar always lands as "ksud-<variant>.version".
+            self.blobs[VARIANTS[variant]["file"]] = blob
             self.metadata[f"ksud-{variant}.version"] = {
                 "variant": variant,
                 "commit": "1" * 40,
