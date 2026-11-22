@@ -148,7 +148,7 @@ jobs:
 
           fetch_gh tiann/KernelSU "" \
                    ksud-aarch64-linux-android "$base/ksud"
-          fetch_gh 250965249/KernelSU-Next-Samsung latest-ksud \
+          fetch_gh 250965249/KernelSU-Next latest-ksud \
                    ksud-next-aarch64 "$base/ksud-next"
           # ksud embeds the kernel modules. Samsung requires the adapted modules
           # from the samsung producer; an official Nova binary is not a substitute
@@ -168,7 +168,7 @@ jobs:
               echo "::warning::no version sidecar for $1 ($2) - the label falls back to the code stamped in the binary"
             fi
           }
-          sidecar next   250965249/KernelSU-Next-Samsung
+          sidecar next   250965249/KernelSU-Next
           sidecar sukisu 250965249/SukiSU-Ultra
 
           # A plain `file`-style check is not available on every runner image, so
@@ -373,11 +373,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # New KernelSU/Next CI managers are audited separately until their
-          # Samsung kernels share the required UAPI and upstream source base.
+          # The official KernelSU-Next manager now ships with the Samsung-adapted
+          # next producer (they share the required UAPI and official dev source
+          # base), so it is released alongside SukiSU. The stock default manager
+          # stays audit-only.
           python3 tools/fetch_managers.py \
             --payload-lock app-output/payloads.lock.json \
-            --only sukisu \
+            --only sukisu --only next \
             --out managers
           ls -l managers
           cat managers/managers.json
@@ -396,12 +398,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          python3 tools/verify_manager_apks.py --only sukisu --managers managers \
+          python3 tools/verify_manager_apks.py --only sukisu --only next --managers managers \
             --apksigner "$ANDROID_HOME/build-tools/36.0.0/apksigner" \
             --aapt2 "$ANDROID_HOME/build-tools/36.0.0/aapt2"
           apk=$(find app-output -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$apk"
-          python3 tools/verify_manager_pairing.py --only sukisu \
+          python3 tools/verify_manager_pairing.py --only sukisu --only next \
             --lock app-output/payloads.lock.json --apk "$apk" \
             --managers managers --out managers/manager-pairing.json
 
@@ -443,11 +445,12 @@ jobs:
           test -s dist/payloads.lock.json
           test -s dist/versions.properties
           test -s managers/GhostSam-manager-SukiSU.apk
+          test -s managers/GhostSam-manager-KernelSU-Next.apk
           test -s managers/managers.json
           test -s managers/manager-pairing.json
           apk=$(find dist -maxdepth 1 -name '*.apk' -print -quit)
           test -n "$apk"
-          python3 tools/verify_manager_pairing.py --only sukisu \
+          python3 tools/verify_manager_pairing.py --only sukisu --only next \
             --lock dist/payloads.lock.json --apk "$apk" \
             --managers managers --out managers/manager-pairing.json
           ( cd managers && sha256sum *.apk > ../managers.sha256 )

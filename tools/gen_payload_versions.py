@@ -57,7 +57,7 @@ VARIANTS: dict[str, dict[str, str]] = {
     "next": {
         "file": "ksud-next",
         "display": "KernelSU-Next",
-        "source": "250965249/KernelSU-Next-Samsung",
+        "source": "250965249/KernelSU-Next",
         "release_tag": "latest-ksud",
     },
     "sukisu": {

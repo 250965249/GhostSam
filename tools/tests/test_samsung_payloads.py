@@ -12,6 +12,8 @@ from verify_samsung_payloads import verify
 
 VARIANT = "sukisu"
 CODE = 35046
+NEXT_VARIANT = "next"
+NEXT_CODE = 33000
 
 
 class SamsungPayloadTests(unittest.TestCase):
@@ -20,18 +22,25 @@ class SamsungPayloadTests(unittest.TestCase):
         # host's temporary-directory permissions. The CLI also checks real files.
         self.payloads = Path("payloads")
         self.sidecars = Path("sidecars")
-        name = "3.0.0-1-g1234567"
-        blob = b"\x7fELF\x00KSU_NO_NEW_PRIVS" + str(CODE).encode() + name.encode() + b"\x00"
-        self.blobs = {f"ksud-{VARIANT}": blob}
-        self.metadata = {
-            f"ksud-{VARIANT}.version": {
-                "variant": VARIANT,
+        self.blobs = {}
+        self.metadata = {}
+
+        def add_fixture(variant: str, code: int, name: str) -> None:
+            blob = b"\x7fELF\x00KSU_NO_NEW_PRIVS" + str(code).encode() + name.encode() + b"\x00"
+            self.blobs[f"ksud-{variant}"] = blob
+            self.metadata[f"ksud-{variant}.version"] = {
+                "variant": variant,
                 "commit": "1" * 40,
-                "version_code": str(CODE),
+                "version_code": str(code),
                 "version_name": name,
                 "sha256": hashlib.sha256(blob).hexdigest(),
             }
-        }
+
+        # verify() iterates PRODUCERS, which now covers both next and sukisu; a
+        # fixture is required for each producer or verify() reports the missing one.
+        add_fixture(VARIANT, CODE, "3.0.0-1-g1234567")
+        add_fixture(NEXT_VARIANT, NEXT_CODE, "3.4.2-1-g89abcde")
+
         for mock in (
             patch.object(Path, "is_file", lambda path: path.name in self.blobs),
             patch.object(Path, "read_bytes", lambda path: self.blobs[path.name]),

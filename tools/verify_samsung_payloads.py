@@ -18,6 +18,7 @@ from gen_payload_versions import read_sidecar
 from probe_payload_version import probe
 
 PRODUCERS = {
+    "next": "250965249/KernelSU-Next",
     "sukisu": "250965249/SukiSU-Ultra",
 }
 

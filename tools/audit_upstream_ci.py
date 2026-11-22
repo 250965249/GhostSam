@@ -26,10 +26,10 @@ BASELINES = {
         "produced_build": "no published CI artifact or sidecar verified",
     },
     "next": {
-        "repo": "250965249/KernelSU-Next-Samsung", "branch": "samsung",
-        "anchor": "4c706b5938665866ebe16944a481a7b91e3396af",
+        "repo": "250965249/KernelSU-Next", "branch": "samsung",
+        "anchor": "32e25d58fc1a187e1abe7278904c31571235fc83",
         "official": "KernelSU-Next/KernelSU-Next",
-        "produced_build": "latest-ksud; its intermediate upstream is not the official dev branch",
+        "produced_build": "latest-ksud; official dev + Samsung adaptation producer",
     },
 }
 
