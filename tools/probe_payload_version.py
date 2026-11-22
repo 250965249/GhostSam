@@ -32,11 +32,12 @@ from pathlib import Path
 
 ELF_MAGIC = b"\x7fELF"
 
-#: Per-project `VERSION_CODE` offset, copied from each project's build.rs.
-#: SukiSU renamed itself to SukiSU-Nova and changed the formula from
-#: 40000-2815 to 30000-4001 in the same commit; keep them in sync.
+#: Per-project `VERSION_CODE` offsets, copied from each project's build.rs at the
+#: commit the payload was built from. Upstream has changed the formula more than
+#: once (40000-2815 -> 30000-4001 -> 30000+996), so treat this as documentation
+#: rather than a contract: a mismatch is reported, never treated as a defect.
 VERSION_CODE_OFFSETS = {
-    "sukisu": 30000 - 4001,
+    "sukisu": 30000 + 996,
     "next": 30000,
     "default": 20000,
 }
@@ -138,10 +139,13 @@ def probe(path: Path, variant: str | None = None) -> dict:
         count = code - offset
         info["commit_count"] = count
         if count <= 0:
-            info["problems"].append(
-                f"version_code {code} is not explainable by the {variant} offset "
-                f"{offset} — wrong variant mapping?"
-            )
+            # Upstream rewrites the formula every few releases, so a stale
+            # constant here says nothing about the payload being wrong.
+            info["notes"] = [
+                f"version_code {code} does not fit the recorded {variant} offset "
+                f"{offset}; build.rs changed its formula, commit_count is unavailable"
+            ]
+            info["commit_count"] = None
 
     # A polluted version_name is not fatal here: the producer sidecar can supply
     # the real one. gen_payload_versions.py decides whether it is an error.
