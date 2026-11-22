@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from audit_upstream_ci import collect_delta, compare_histories
+from audit_upstream_ci import BASELINES, audit, collect_delta, compare_histories, main as audit_main
 from github_ci import CiSourceError
 
 ANCHOR = "a" * 40
@@ -23,6 +26,60 @@ def delta(commits, **overrides):
 
 
 class SourceAuditTests(unittest.TestCase):
+    def source_report(self, reader, manager_uapi=6):
+        records = [
+            {'variant': variant, 'pairing': 'not-verified', 'signature_verified': True,
+             'uapi_version': manager_uapi, 'ci': {'repository': spec['official'], 'commit': OFFICIAL}}
+            for variant, spec in BASELINES.items()
+        ]
+        def histories(*args):
+            return {'official_commits_missing': 1, 'source_caught_up': False, 'patch_semantics_reviewed': False}
+        with patch('audit_upstream_ci.compare_histories', side_effect=histories):
+            return audit(records, lambda path: {'object': {'sha': PRODUCER}}, reader)
+
+    def test_missing_compatible_build_is_not_a_network_failure(self):
+        report = self.source_report(lambda repo, commit: 5)
+        self.assertTrue(report['audit_complete'])
+        self.assertEqual([], report['retrieval_errors'])
+        for entry in report['variants'].values():
+            self.assertEqual('different_contract', entry['uapi_status'])
+            self.assertIn('uapi_contract_mismatch', entry['not_ready_reasons'])
+            self.assertFalse(entry['release_ready'])
+
+    def test_header_retrieval_failure_is_an_incomplete_audit(self):
+        def failed(repo, commit):
+            raise RuntimeError('header download failed')
+        report = self.source_report(failed)
+        self.assertFalse(report['audit_complete'])
+        self.assertEqual(2, len(report['retrieval_errors']))
+        for entry in report['variants'].values():
+            self.assertEqual('unavailable', entry['uapi_status'])
+            self.assertIsNone(entry['uapi_compatible'])
+            self.assertIn('uapi_verification_unavailable', entry['not_ready_reasons'])
+
+    def test_incomplete_audit_cli_returns_failure_not_success(self):
+        def failed(repo, commit):
+            raise RuntimeError('header download failed')
+        report = self.source_report(failed)
+        with patch.object(Path, 'read_text', return_value='[]'), patch.object(Path, 'write_text') as write, \
+             patch('audit_upstream_ci.audit', return_value=report), \
+             contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(1, audit_main(['--managers', 'manager.json', '--out', 'audit.json']))
+            write.assert_called_once()
+
+    def test_smaller_manager_uapi_is_not_automatically_a_reviewed_contract(self):
+        report = self.source_report(lambda repo, commit: 6, manager_uapi=5)
+        self.assertTrue(report['audit_complete'])
+        self.assertFalse(report['variants']['default']['uapi_compatible'])
+
+    def test_matching_numeric_uapi_does_not_prove_device_or_receipt_readiness(self):
+        report = self.source_report(lambda repo, commit: 6)
+        entry = report['variants']['default']
+        self.assertTrue(entry['uapi_compatible'])
+        self.assertEqual('equal_contract', entry['uapi_status'])
+        self.assertFalse(entry['release_ready'])
+        self.assertIn('producer_receipt_not_verified', entry['not_ready_reasons'])
+
     def test_intermediate_fork_sync_does_not_equal_official_sync(self):
         missing = "d" * 40
         local = "e" * 40

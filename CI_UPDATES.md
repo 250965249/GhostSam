@@ -32,7 +32,7 @@
 
 [verify_manager_apks.py](tools/verify_manager_apks.py) 调用 Android 官方 `apksigner verify` 做密码学验证，然后用 `aapt2` 核对包名、版本和 ARM64 库。它保留生产方签名，不使用 GhostSam 密钥重签管理器。只读取证书指纹、或仅看到绿色 CI，均不能冒充签名验证。
 
-[audit_upstream_ci.py](tools/audit_upstream_ci.py) 从两端共有的明确祖先枚举完整提交集合，独立核对官方 CI 与现有基线。分页不完整或共同祖先不成立时拒绝报“同步完成”。该审计同时记录 manager / kernel UAPI，但不声称移植或设备测试完成。
+[audit_upstream_ci.py](<tools/audit_upstream_ci.py>) 从两端共有的明确祖先枚举完整提交集合，独立核对官方 CI 与现有基线。分页不完整或共同祖先不成立时拒绝报“同步完成”。该审计同时记录 manager / kernel UAPI，但不声称移植或设备测试完成。报告区分已确认的接口不配套与网络读取失败：`different_contract` 是完成核查后的事实，`unavailable` 则使 `audit_complete=false` 并返回失败，不能把未知状态包装成核查通过。数值 UAPI 相等仅表示契约号一致，不代表生产收据或运行兼容性已验证；具体缺口列在 `not_ready_reasons`。
 
 ## 当前发布边界
 

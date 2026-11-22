@@ -74,8 +74,9 @@ def compare_histories(api, official: str, producer: str, anchor: str, official_r
     }
 
 
-def audit(records: list[dict], api=api_json) -> dict:
+def audit(records: list[dict], api=api_json, uapi_reader=source_uapi) -> dict:
     entries = {}
+    retrieval_errors = []
     for variant, spec in BASELINES.items():
         candidates = [r for r in records if r.get("variant") == variant]
         if len(candidates) != 1:
@@ -96,20 +97,38 @@ def audit(records: list[dict], api=api_json) -> dict:
             "producer_build_status": spec["produced_build"],
             "runtime_compatibility": "not-tested", "release_ready": False,
         })
+        reasons = ["producer_receipt_not_verified", "runtime_not_tested"]
+        if not result["source_caught_up"]:
+            reasons.append("official_ci_commits_missing")
+        if not result["signature_verified"]:
+            reasons.append("manager_signature_not_verified")
         try:
-            kernel_uapi = source_uapi(spec["repo"], producer_commit)
+            kernel_uapi = uapi_reader(spec["repo"], producer_commit)
+            manager_uapi = record.get("uapi_version")
+            if type(kernel_uapi) is not int or kernel_uapi <= 0 or type(manager_uapi) is not int or manager_uapi <= 0:
+                raise ValueError("UAPI values must be verified positive integers")
         except (RuntimeError, ValueError, KeyError) as exc:
             result["kernel_uapi"] = None
             result["uapi_error"] = str(exc)
             result["uapi_compatible"] = None
+            result["uapi_status"] = "unavailable"
+            retrieval_errors.append(f"{variant}: {exc}")
+            reasons.append("uapi_verification_unavailable")
         else:
             result["kernel_uapi"] = kernel_uapi
-            manager_uapi = record.get("uapi_version")
-            result["uapi_compatible"] = isinstance(manager_uapi, int) and manager_uapi <= kernel_uapi
+            # Equality is the current release contract. A lower manager UAPI
+            # must not be called a reviewed pair merely because it is numeric.
+            result["uapi_compatible"] = manager_uapi == kernel_uapi
+            result["uapi_status"] = "equal_contract" if manager_uapi == kernel_uapi else "different_contract"
+            if manager_uapi != kernel_uapi:
+                reasons.append("uapi_contract_mismatch")
+        result["not_ready_reasons"] = reasons
         entries[variant] = result
     return {
         "observed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "mode": "read-only-source-and-uapi-audit",
+        "audit_complete": not retrieval_errors,
+        "retrieval_errors": retrieval_errors,
         "variants": entries,
         "release_boundary": "CI candidates are not automatically Samsung-compatible payloads or releases",
     }
@@ -125,7 +144,12 @@ def main(argv: list[str]) -> int:
         args.out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         for variant, result in report["variants"].items():
             print(f"{variant}: missing official CI commits={result['official_commits_missing']}; "
-                  f"manager UAPI={result['manager_uapi']}, baseline UAPI={result['kernel_uapi']}; not release-ready")
+                  f"manager UAPI={result['manager_uapi']}, baseline UAPI={result['kernel_uapi']}; "
+                  f"UAPI status={result['uapi_status']}; not release-ready")
+        if not report["audit_complete"]:
+            for error in report["retrieval_errors"]:
+                print(f"ERROR incomplete source audit: {error}", file=sys.stderr)
+            return 1
     except (CiSourceError, RuntimeError, OSError, ValueError, KeyError) as exc:
         print(f"ERROR {exc}", file=sys.stderr)
         return 1
