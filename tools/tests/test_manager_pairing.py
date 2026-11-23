@@ -46,6 +46,10 @@ def api(path):
         return {'id': 99, 'name': 'ksud-aarch64-linux-android', 'expired': False,
                 'digest': 'sha256:' + 'd' * 64,
                 'workflow_run': {'id': 42, 'head_sha': KERNEL_COMMIT}}
+    # compare/{left}...{right}: an ancestor-or-equal check uses merge_base == left.
+    if '/compare/' in path:
+        left = path.split('/compare/', 1)[1].split('...', 1)[0]
+        return {'behind_by': 0, 'merge_base_commit': {'sha': left}}
     return {'behind_by': 0, 'merge_base_commit': {'sha': MANAGER_COMMIT}}
 
 
@@ -114,6 +118,65 @@ class PairingTests(unittest.TestCase):
         with self.assertRaisesRegex(PairingError, 'APK payload is not'):
             verify_pair('default', manager(), kernel(), api, lambda repo, commit: 6,
                         lambda repo, artifact_id, digest: 'e' * 64)
+
+    def test_sync_merge_run_head_before_merge_is_accepted(self):
+        # Daily sync path: the run merged the official branch and pushed the merge,
+        # so its head_sha is the pre-merge tip while the kernel commit is the result.
+        premerge = 'e' * 40
+
+        def api_reader(path):
+            if '/actions/runs/' in path:
+                data = api(path)
+                data['head_sha'] = premerge
+                return data
+            if '/actions/artifacts/' in path:
+                data = api(path)
+                data['workflow_run'] = {'id': 42, 'head_sha': premerge}
+                return data
+            left = path.split('/compare/', 1)[1].split('...', 1)[0]
+            return {'behind_by': 0, 'merge_base_commit': {'sha': left}}
+
+        result = self.pair(api_reader=api_reader)
+        self.assertTrue(result['contract_verified'])
+        self.assertEqual(KERNEL_COMMIT, result['kernel_commit'])
+
+    def test_tampered_run_ancestry_is_rejected(self):
+        premerge = 'e' * 40
+        for bad in ({'behind_by': 1, 'merge_base_commit': {'sha': premerge}},
+                    {'behind_by': 0, 'merge_base_commit': {'sha': 'f' * 40}}):
+            def api_reader(path, bad=bad):
+                if '/actions/runs/' in path:
+                    data = api(path)
+                    data['head_sha'] = premerge
+                    return data
+                if '/actions/artifacts/' in path:
+                    data = api(path)
+                    data['workflow_run'] = {'id': 42, 'head_sha': premerge}
+                    return data
+                left = path.split('/compare/', 1)[1].split('...', 1)[0]
+                if left == premerge:
+                    return bad
+                return {'behind_by': 0, 'merge_base_commit': {'sha': left}}
+            with self.subTest(bad=bad), self.assertRaisesRegex(PairingError, 'immutable Samsung build'):
+                self.pair(api_reader=api_reader)
+
+    def test_artifact_run_revision_must_equal_run_head(self):
+        premerge = 'e' * 40
+
+        def api_reader(path):
+            if '/actions/runs/' in path:
+                data = api(path)
+                data['head_sha'] = premerge
+                return data
+            if '/actions/artifacts/' in path:
+                data = api(path)
+                data['workflow_run'] = {'id': 42, 'head_sha': 'f' * 40}
+                return data
+            left = path.split('/compare/', 1)[1].split('...', 1)[0]
+            return {'behind_by': 0, 'merge_base_commit': {'sha': left}}
+
+        with self.assertRaisesRegex(PairingError, 'artifact identity'):
+            self.pair(api_reader=api_reader)
 
     def test_missing_ancestry_and_auto_resolved_kernel_conflicts_are_rejected(self):
         with self.assertRaises(PairingError):

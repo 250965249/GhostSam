@@ -107,16 +107,29 @@ def verify_pair(variant: str, manager: dict, kernel: dict, api=api_json, uapi_re
         if (run.get("status") != "completed" or run.get("conclusion") != "success"
             or run.get("event") not in ("push", "workflow_dispatch", "schedule")
             or (run.get("head_repository") or {}).get("full_name") != repository
-            or run.get("head_sha") != kernel_commit
             or run.get("head_branch") != "samsung"
             or run.get("path", "").split("@")[0] != ".github/workflows/auto-sync-build.yml"):
+            raise PairingError(f"{variant}: producer run is not the configured immutable Samsung build")
+        # The daily sync run merges the official branch and pushes the merge in the
+        # same run: its head_sha is the pre-merge branch tip frozen when the run
+        # started, while the kernel commit is the post-merge result, so equality
+        # never holds on that normal path. Require the run tip to be an ancestor of
+        # (or equal to) the kernel commit instead: the run was built from the direct
+        # history of this tree. Byte-level binding stays the artifact digest ==
+        # payload sha256 below; a compare 404 (unknown commit) fails via api().
+        run_head = full_revision(run.get("head_sha"))
+        ancestry = api(f"repos/{repository}/compare/{run_head}...{kernel_commit}")
+        if (ancestry.get("behind_by") != 0
+                or (ancestry.get("merge_base_commit") or {}).get("sha") != run_head):
             raise PairingError(f"{variant}: producer run is not the configured immutable Samsung build")
         artifact_id = positive_integer(kernel.get("producer_artifact_id"), "producer artifact id")
         digest = kernel.get("producer_artifact_digest")
         artifact = api(f"repos/{repository}/actions/artifacts/{artifact_id}")
         identity = artifact.get("workflow_run") or {}
+        # The artifact belongs to this run, so its workflow_run.head_sha must equal
+        # the run's own head_sha (the pre-merge tip), not the merged kernel commit.
         if (artifact.get("id") != artifact_id or artifact.get("name") != "ksud-aarch64-linux-android" or artifact.get("expired") is not False
-            or identity.get("id") != run_id or identity.get("head_sha") != kernel_commit
+            or identity.get("id") != run_id or identity.get("head_sha") != run_head
             or not isinstance(digest, str) or artifact.get("digest") != digest):
             raise PairingError(f"{variant}: producer artifact identity differs from the receipt")
         if artifact_reader(repository, artifact_id, digest) != kernel.get("sha256"):
