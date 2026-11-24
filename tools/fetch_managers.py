@@ -9,6 +9,10 @@ Sources differ per project:
            of compatibility with the existing Samsung kernel.
   sukisu   SukiSU-Nova v3.0.0 stays pinned; its manager shares the existing
            producer's UAPI. Never silently advance it to a future UAPI.
+  maplesu  Provisional slot for 250965249/MapleSU (Samsung-side fork of
+           FengQiuFQ/MapleSU). Its release channel does not exist yet, so this
+           entry fails closed and, being a release-domain source, is allowed to
+           carry the previous GhostSam release's manager forward.
 
 Pinned and CI sources fail closed. Missing/expired artifacts are not replaced
 with an arbitrary older APK. Signature and pairing verification are separate
@@ -37,6 +41,10 @@ import zipfile
 from pathlib import Path
 
 from github_ci import full_revision, provenance, resolve_ci
+#: Owner of VARIANTS/PROVISIONAL: the "registered but producer offline" set has
+#: exactly one definition there, and this module reads it instead of keeping a
+#: private copy that could drift.
+from gen_payload_versions import PROVISIONAL
 
 SPEC: dict[str, dict] = {
     "default": {
@@ -76,6 +84,36 @@ SPEC: dict[str, dict] = {
         "repo": "SukiSU-Nova/SukiSU-Nova",
         "out": "GhostSam-manager-SukiSU.apk",
         "display": "SukiSU-Nova",
+        "prefer": [
+            re.compile(r"-universal-release\.apk$"),
+            re.compile(r"(?<!spoofed)-release\.apk$"),
+            re.compile(r"\.apk$"),
+        ],
+    },
+    "maplesu": {
+        # Provisional fourth slot, registered before its producer exists.
+        # 250965249/MapleSU (Samsung-side fork of FengQiuFQ/MapleSU) has no
+        # release, no nightly.link-indexed artifact and no
+        # `GhostSam-manager-MapleSU.apk` anywhere yet, so today every branch of
+        # this spec ends in `carry_over()` and then in "no previous GhostSam
+        # release carried it".
+        #
+        # `kind: release` is the closest existing mechanism: MapleSU ships its
+        # manager as an APK with the project's own identity (package
+        # `dev.maplesu.manager`, signing cert DER 772B, certificate SHA-256
+        # prefix 30bafb57…; the full 64-hex pin still has to be added to
+        # verify_manager_apks.MANAGERS once the APK is in hand). Unlike `ci` and
+        # `pinned_tag` sources, the release domain permits the documented
+        # carry-over path.
+        #
+        # While the producer is offline this entry is skipped outright by
+        # `main()`, which reads the single-source PROVISIONAL set from
+        # gen_payload_versions; delete the key from that set (not from here) once
+        # the release channel exists.
+        "kind": "release",
+        "repo": "250965249/MapleSU",
+        "out": "GhostSam-manager-MapleSU.apk",
+        "display": "MapleSU",
         "prefer": [
             re.compile(r"-universal-release\.apk$"),
             re.compile(r"(?<!spoofed)-release\.apk$"),
@@ -493,6 +531,17 @@ def main(argv: list[str]) -> int:
 
     for variant, spec in SPEC.items():
         if args.only and variant not in args.only:
+            continue
+        if variant in PROVISIONAL:
+            # The producer has no release channel at all yet, so there is nothing
+            # to download and nothing to carry over. Skip loudly and keep the
+            # other managers coming; the release gate still refuses to publish a
+            # build whose manager set is incomplete.
+            print(
+                f"::warning::{variant}: provisional variant - {spec['repo']} has no "
+                "release channel yet; skipped (drop it from "
+                "gen_payload_versions.PROVISIONAL once the producer publishes)"
+            )
             continue
         try:
             if contract is not None:

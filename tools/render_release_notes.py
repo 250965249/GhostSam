@@ -23,11 +23,14 @@ import json
 import re
 from pathlib import Path
 
-ORDER = ["sukisu", "next", "default"]
+ORDER = ["sukisu", "next", "default", "maplesu"]
 LABEL = {
     "sukisu": "SukiSU-Nova",
     "next": "KernelSU-Next",
     "default": "KernelSU (official)",
+    # Registered fourth slot; it only appears in the table once its producer
+    # publishes a payload (the lock carries no entry until then).
+    "maplesu": "MapleSU",
 }
 
 
@@ -40,6 +43,12 @@ def sha256(path: Path) -> str:
 
 
 def sync_cell(entry: dict) -> str:
+    # The lock records an explicit marker for a slot that was registered but not
+    # published in this build. Read only that marker: inferring the state from the
+    # producer's repository name made every future release of a live MapleSU
+    # producer read as "not online".
+    if entry.get("provisional"):
+        return "本次未交付（provisional·生产方离线）"
     behind = entry.get("behind_upstream")
     if behind is None:
         return "n/a"
@@ -62,12 +71,14 @@ def variant_rows(lock: dict) -> list[str]:
         label = LABEL.get(name, name)
         version = entry.get("version_name") or "unknown"
         # A tree without a reachable version tag describes itself as a bare sha;
-        # that is not a version and reads as noise in the table.
-        if re.fullmatch(r"[0-9a-f]{7,40}", str(version)):
+        # that is not a version and reads as noise in the table. A provisional
+        # slot has no payload at all, so it gets the same dash.
+        if entry.get("provisional") or re.fullmatch(r"[0-9a-f]{7,40}", str(version)):
             version = "—"
         pinned = " (版本钉死)" if entry.get("version_pinned") else ""
+        code = entry.get("version_code")
         rows.append(
-            f"| {label} | `{version}`{pinned} | {entry.get('version_code')} "
+            f"| {label} | `{version}`{pinned} | {code if code is not None else '—'} "
             f"| {sync_cell(entry)} |"
         )
     return rows
@@ -85,6 +96,13 @@ def changes_section(lock: dict, previous: dict | None) -> list[str]:
             continue
         c = cur[name]
         o = old.get(name, {})
+        # A provisional slot is registered but not published in either build: its
+        # version_code is always None, so the `o_code is None` branch below would
+        # announce "新增" in every single release after the first. Never report it
+        # as new or as changed - a genuine first appearance is still caught for
+        # published variants (their previous entry has no version_code either).
+        if c.get("provisional") or o.get("provisional"):
+            continue
         c_code, o_code = c.get("version_code"), o.get("version_code")
         c_sha, o_sha = (c.get("sha256") or "")[:12], (o.get("sha256") or "")[:12]
         if o_code is None:

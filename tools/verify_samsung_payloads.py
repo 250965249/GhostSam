@@ -14,14 +14,29 @@ import re
 import sys
 from pathlib import Path
 
-from gen_payload_versions import VARIANTS, read_sidecar
+from gen_payload_versions import PROVISIONAL, VARIANTS, read_sidecar
 from probe_payload_version import probe
 
 PRODUCERS = {
     "default": "250965249/KernelSU",
     "next": "250965249/KernelSU-Next",
     "sukisu": "250965249/SukiSU-Ultra",
+    # Fourth slot, registered ahead of its producer. 250965249/MapleSU (the
+    # Samsung-side fork of FengQiuFQ/MapleSU) publishes no `latest-ksud`
+    # release, no `ksud-maplesu-aarch64` asset and no `.version` sidecar yet, so
+    # the whole contract below is unenforceable today. Keeping the key in
+    # PRODUCERS makes the slot addressable in one table, while PROVISIONAL keeps
+    # a real build of the three live variants alive instead of failing it on an
+    # artefact that cannot exist. The moment a MapleSU payload lands the full
+    # contract (sidecar variant/commit/sha256/version_code/version_name plus the
+    # .rodata stamp) is enforced with no further edit here.
+    "maplesu": "250965249/MapleSU",
 }
+
+# `PROVISIONAL` is imported from gen_payload_versions: that module owns the
+# variant tables, so the "registered but the producer is offline" set has exactly
+# one definition. A variant listed there is skipped only while *both* its payload
+# and its sidecar are absent; a half-published pair is a defect and is reported.
 
 
 def verify(payloads: Path, sidecars: Path) -> list[str]:
@@ -31,8 +46,16 @@ def verify(payloads: Path, sidecars: Path) -> list[str]:
         # plain ``ksud``); the sidecar always lands as ``ksud-<variant>.version``.
         payload_file = VARIANTS[variant]["file"]
         binary = payloads / payload_file
-        sidecar = read_sidecar(sidecars / f"ksud-{variant}.version")
+        sidecar_path = sidecars / f"ksud-{variant}.version"
         prefix = f"{variant} ({producer})"
+        if variant in PROVISIONAL and not binary.is_file() and not sidecar_path.is_file():
+            print(
+                f"NOTICE {prefix}: provisional variant - the producer has published "
+                f"neither {payload_file} nor {sidecar_path.name} yet; skipped",
+                file=sys.stderr,
+            )
+            continue
+        sidecar = read_sidecar(sidecar_path)
         if not binary.is_file():
             problems.append(f"{prefix}: payload missing")
             continue

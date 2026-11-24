@@ -66,7 +66,28 @@ VARIANTS: dict[str, dict[str, str]] = {
         "source": "250965249/SukiSU-Ultra",
         "release_tag": "latest-ksud",
     },
+    # Fourth slot, registered ahead of its producer: 250965249/MapleSU (the
+    # Samsung-side fork of FengQiuFQ/MapleSU) has no `latest-ksud` release and no
+    # `ksud-maplesu-aarch64` payload yet, so this entry is inert and is listed in
+    # PROVISIONAL below. The key, file name, display name and producer source are
+    # the values the rest of the chain (verify_samsung_payloads.PRODUCERS,
+    # fetch_managers.SPEC, render_release_notes.ORDER) already addresses.
+    "maplesu": {
+        "file": "ksud-maplesu",
+        "display": "MapleSU",
+        "source": "250965249/MapleSU",
+        "release_tag": "latest-ksud",
+    },
 }
+
+#: Single source of truth for "registered, but the producer has not published the
+#: Samsung payload chain yet" (currently the fourth slot only). Every consumer
+#: imports this set instead of repeating the literal: verify_samsung_payloads and
+#: fetch_managers both read it from here. A variant in this set is skipped only
+#: while *both* its payload and its sidecar are absent; a missing payload for it
+#: is a warning, not a problem, and the lock records an explicit `provisional`
+#: entry so nothing downstream has to infer the state from a repository name.
+PROVISIONAL = {"maplesu"}
 
 MANIFEST_NAME = "versions.properties"
 LOCK_NAME = "payloads.lock.json"
@@ -130,9 +151,62 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
     entries: dict[str, dict] = {}
     problems: list[str] = []
     warnings: list[str] = []
+    skipped: dict[str, str] = {}
 
     for variant, spec in VARIANTS.items():
         path = payloads / spec["file"]
+        # Sidecars land as ``ksud-<variant>.version`` (see auto-build.yml
+        # sidecar()), which for default differs from its payload file name
+        # ``ksud``; always key by variant, never by payload file name.
+        sidecar_path = sidecars / f"ksud-{variant}.version"
+        if variant in PROVISIONAL and not path.is_file() and not sidecar_path.is_file():
+            # Neither half of the pair exists: the producer has not published the
+            # payload chain. Record that decision explicitly instead of leaving a
+            # hole - the release notes read this marker, never the repository name,
+            # so a live producer can never be reported as "not online".
+            reason = (
+                f"{spec['source']} publishes neither {spec['file']} nor "
+                f"{sidecar_path.name} yet"
+            )
+            warnings.append(
+                f"{variant}: provisional variant - {reason}; the slot is registered "
+                "but not part of this release"
+            )
+            skipped[variant] = reason
+            entries[variant] = {
+                "variant": variant,
+                "display": spec["display"],
+                "source": spec["source"],
+                "file": spec["file"],
+                "version_code": None,
+                "version_name": None,
+                "elf_version_name": None,
+                "tag": None,
+                "distance": None,
+                "commit": None,
+                "commit_count": None,
+                "built_at": None,
+                "version_pinned": False,
+                "git_version_name": None,
+                "behind_upstream": None,
+                "upstream_commit": None,
+                "upstream_version_name": None,
+                "kernel_version_code": None,
+                "kernel_uapi_version": None,
+                "build_kind": None,
+                "producer_run_id": None,
+                "producer_artifact_id": None,
+                "producer_artifact_digest": None,
+                "official_ci_commit": None,
+                "merge_auto_resolved": None,
+                "size": None,
+                "sha256": None,
+                # Explicit marker: registered, but NOT published in this build.
+                "provisional": True,
+                "provisional_reason": reason,
+                "label": f"{spec['display']} (not published)",
+            }
+            continue
         if not path.is_file():
             problems.append(f"{variant}: payload {spec['file']} is missing")
             continue
@@ -141,10 +215,6 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
         digest = sha256(path)
         info["sha256"] = digest
 
-        # Sidecars land as ``ksud-<variant>.version`` (see auto-build.yml
-        # sidecar()), which for default differs from its payload file name
-        # ``ksud``; always key by variant, never by payload file name.
-        sidecar_path = sidecars / f"ksud-{variant}.version"
         sidecar = read_sidecar(sidecar_path)
         sidecar_name = (sidecar.get("version_name") or "").strip()
         sidecar_names_the_build = bool(sidecar_name) and not is_polluted(sidecar_name)
@@ -240,6 +310,9 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
             "merge_auto_resolved": sidecar.get("merge_auto_resolved"),
             "size": info["size"],
             "sha256": digest,
+            # Published in this build: the marker is what render_release_notes
+            # reads, so a live producer is never described as "not online".
+            "provisional": False,
             "label": format_label(
                 spec["display"], info["version_name"], info["version_code"], sidecar
             ),
@@ -249,6 +322,9 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
         "generated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "payloads_dir": str(payloads),
         "variants": entries,
+        # Explicit, machine-readable record of every provisional slot that was
+        # registered but not published in this build (empty when all are live).
+        "provisional": skipped,
         "problems": problems,
         "warnings": warnings,
     }
@@ -270,7 +346,9 @@ def render_manifest(report: dict) -> str:
     ]
     for variant in VARIANTS:
         entry = report["variants"].get(variant)
-        if not entry:
+        # A provisional slot that was not published must not gain a manifest line:
+        # the settings screen would then advertise a payload that is not bundled.
+        if not entry or entry.get("provisional"):
             continue
         lines.append(f"{variant}={entry['label']}")
     return "\n".join(lines) + "\n"

@@ -6,6 +6,7 @@ Every ksud variant derives its version from git *inside* build.rs:
     SukiSU-Ultra     VERSION_CODE = 30000 - 4001 + `git rev-list --count HEAD`
     KernelSU-Next    VERSION_CODE = 30000 + `git rev-list --count HEAD`
     KernelSU         VERSION_CODE = 30000 + `git rev-list --count HEAD`
+    MapleSU          VERSION_CODE = unknown, provisional slot (`None` in the table)
 
     VERSION_NAME = `git describe --tags --always`  (leading 'v' stripped)
 
@@ -40,6 +41,12 @@ VERSION_CODE_OFFSETS = {
     "sukisu": 30000 + 996,
     "next": 30000,
     "default": 30000,
+    # MapleSU (250965249/MapleSU) keeps `None` on purpose: its
+    # `userspace/ksud/build.rs` formula has not been read at a commit a payload
+    # was actually built from, and inventing one would turn a real mismatch into
+    # a silent "commit_count" lie. The key exists so `--variant maplesu` is
+    # addressable and so the gap is visible instead of missing.
+    "maplesu": None,
 }
 
 #: <anchor><5 digit code><version name>
@@ -146,6 +153,13 @@ def probe(path: Path, variant: str | None = None) -> dict:
                 f"{offset}; build.rs changed its formula, commit_count is unavailable"
             ]
             info["commit_count"] = None
+    elif variant in VERSION_CODE_OFFSETS:
+        # Registered variant with no verified formula (maplesu): report the gap
+        # rather than silently returning commit_count=None as if it were fine.
+        info["notes"] = [
+            f"{variant} has no recorded VERSION_CODE offset; its userspace/ksud/build.rs "
+            "formula is unverified, so commit_count is unavailable"
+        ]
 
     # A polluted version_name is not fatal here: the producer sidecar can supply
     # the real one. gen_payload_versions.py decides whether it is an error.
