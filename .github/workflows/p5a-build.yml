@@ -232,7 +232,7 @@ jobs:
           python3 tools/verify_variant_routing.py \
             --root . \
             --apk app/app/build/outputs/apk/debug/app-debug.apk \
-            --payload "\/ksud-maplesu"
+            --payload "$PAYLOAD_DIR/ksud-maplesu"
 
       - name: Stage deliverables and a small summary
         run: |

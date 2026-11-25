@@ -161,7 +161,11 @@ def main(argv: list[str]) -> int:
                 checks.add("APK bundles ksud-maplesu", entry in names, entry)
                 if entry in names:
                     data = zf.read(entry)
-                    want = payload.read_bytes() if payload.is_file() else b""
+                    if not payload.is_file():
+                        checks.add("payload file readable", False, f"not found: {payload}")
+                        want = b""
+                    else:
+                        want = payload.read_bytes()
                     checks.add(
                         "APK payload bytes equal the fed payload",
                         bool(want) and data == want,
