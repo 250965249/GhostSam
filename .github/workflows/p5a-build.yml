@@ -1,0 +1,274 @@
+name: P5a build (four payloads, maplesu included)
+
+# Feeds the MapleSU ksud+LKM bundle into the GhostSam container and builds the APK
+# with all four payloads bundled (default / next / sukisu from their producers,
+# maplesu from a MapleSU fork run artifact), then proves the packaged result.
+#
+# Why the payload is fetched here rather than committed: the artifact is 46.6 MB and
+# this machine reaches GitHub object storage at 3-40 KB/s, so pulling it locally to
+# commit it is not practical. The build is deterministic - the artifact id and its
+# digest are pinned in the receipt, and tools/emit_samsung_sidecar.py refuses to
+# write a field it cannot measure.
+#
+# Cross-repository read needs a token: GITHUB_TOKEN only sees this repository, so add
+# a repository secret MAPLESU_ARTIFACT_TOKEN (fine-grained PAT: Actions = read on
+# 250965249/MapleSU). Without it the workflow stops with an explicit message instead
+# of silently building a three-payload APK.
+
+on:
+  workflow_dispatch:
+    inputs:
+      maplesu_artifact_id:
+        description: "MapleSU Actions artifact id holding libksud_ksu.so"
+        default: "14980758843"
+      maplesu_payload_member:
+        description: "ksud payload path inside the artifact zip"
+        default: "libksud_ksu.so"
+      maplesu_run_id:
+        description: "producer run id recorded in the receipt"
+        default: "45523572248"
+      maplesu_commit:
+        description: "MapleSU commit the artifact was built from"
+        default: "b3e5057c99b3fba5901cbed6a4140a7d59462d6f"
+      maplesu_artifact_digest:
+        description: "artifact digest from the Actions API (sha256:...)"
+        default: "sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2"
+      maplesu_kernel_uapi:
+        description: "kernel UAPI the payload was built against"
+        default: "6"
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  PAYLOAD_DIR: app/app/src/main/assets/payloads/ksud
+  SIDECAR_DIR: payloads-sidecars
+  LOCK_FILE: payloads.lock.json
+  COMPILE_SDK: "36"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: add-maplesu-variant
+          fetch-depth: 1
+
+      - name: Fetch the three live payloads and their receipts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          base="$PAYLOAD_DIR"; side="$SIDECAR_DIR"
+          mkdir -p "$base" "$side"
+          work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+          fetch_gh() { # $1=repo $2=tag $3=asset $4=dest
+            local dir="$work/f$RANDOM"; mkdir -p "$dir"
+            gh release download "$2" -R "$1" --pattern "$3" --dir "$dir" --clobber
+            test -f "$dir/$3"; mv "$dir/$3" "$4"
+            echo "$3 -> $4 ($(stat -c%s "$4") bytes)"
+          }
+          sidecar() { # $1=variant $2=repo
+            local asset="ksud-$1-aarch64.version"; local dir="$work/s$RANDOM"; mkdir -p "$dir"
+            gh release download latest-ksud -R "$2" --pattern "$asset" --dir "$dir" --clobber
+            mv "$dir/$asset" "$side/ksud-$1.version"
+            echo "sidecar: $1 from $2"
+          }
+          fetch_gh 250965249/KernelSU     latest-ksud ksud-default-aarch64 "$base/ksud"
+          fetch_gh 250965249/KernelSU-Next latest-ksud ksud-next-aarch64   "$base/ksud-next"
+          fetch_gh 250965249/SukiSU-Ultra latest-ksud ksud-sukisu-aarch64  "$base/ksud-sukisu"
+          sidecar default 250965249/KernelSU
+          sidecar next    250965249/KernelSU-Next
+          sidecar sukisu  250965249/SukiSU-Ultra
+
+      - name: Feed the maplesu payload from the MapleSU run artifact
+        env:
+          MAPLESU_TOKEN: ${{ secrets.MAPLESU_ARTIFACT_TOKEN }}
+          ARTIFACT_ID: ${{ inputs.maplesu_artifact_id }}
+          MEMBER: ${{ inputs.maplesu_payload_member }}
+          RUN_ID: ${{ inputs.maplesu_run_id }}
+          MAPLE_COMMIT: ${{ inputs.maplesu_commit }}
+          ARTIFACT_DIGEST: ${{ inputs.maplesu_artifact_digest }}
+          KERNEL_UAPI: ${{ inputs.maplesu_kernel_uapi }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_ID="${ARTIFACT_ID:-14980758843}"
+          MEMBER="${MEMBER:-libksud_ksu.so}"
+          RUN_ID="${RUN_ID:-45523572248}"
+          MAPLE_COMMIT="${MAPLE_COMMIT:-b3e5057c99b3fba5901cbed6a4140a7d59462d6f}"
+          ARTIFACT_DIGEST="${ARTIFACT_DIGEST:-sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2}"
+          KERNEL_UAPI="${KERNEL_UAPI:-6}"
+          out="$PAYLOAD_DIR/ksud-maplesu"
+
+          if [ -s "$out" ]; then
+            echo "::notice::$out is already committed in the tree - using it as-is"
+          else
+            if [ -z "${MAPLESU_TOKEN:-}" ]; then
+              echo "::error::no ${out} in the tree and no MAPLESU_ARTIFACT_TOKEN secret."
+              echo "::error::Either add a fine-grained PAT (Actions: read on 250965249/MapleSU) as MAPLESU_ARTIFACT_TOKEN, or commit the payload to ${out} and re-run."
+              exit 1
+            fi
+            work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+            echo "downloading artifact ${ARTIFACT_ID} (${ARTIFACT_DIGEST})"
+            curl -fsSL --retry 5 --retry-all-errors --max-time 1800 \
+              -H "Authorization: Bearer ${MAPLESU_TOKEN}" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/250965249/MapleSU/actions/artifacts/${ARTIFACT_ID}/zip" \
+              -o "$work/artifact.zip"
+            got=$(sha256sum "$work/artifact.zip" | cut -d' ' -f1)
+            echo "artifact sha256 $got"
+            test "sha256:$got" = "$ARTIFACT_DIGEST" || { echo "::error::artifact digest differs from the receipt: $got"; exit 1; }
+            python3 - "$work/artifact.zip" "$work" "$MEMBER" <<'PY'
+import sys, zipfile
+archive, dest, member = sys.argv[1], sys.argv[2], sys.argv[3]
+with zipfile.ZipFile(archive) as z:
+    names = z.namelist()
+    hit = [n for n in names if n == member or n.endswith("/" + member)]
+    if len(hit) != 1:
+        raise SystemExit(f"expected exactly one {member} in the artifact, found {hit[:5]} of {len(names)} entries")
+    with z.open(hit[0]) as src, open(f"{dest}/payload.bin", "wb") as dst:
+        dst.write(src.read())
+print("extracted", hit[0])
+PY
+            install -m 0644 "$work/payload.bin" "$out"
+          fi
+          stat -c '%n %s bytes' "$out"
+          sha256sum "$out"
+          python3 tools/probe_payload_version.py "$out" --variant maplesu --json
+
+      - name: Emit the maplesu receipt from measured facts
+        env:
+          ARTIFACT_ID: ${{ inputs.maplesu_artifact_id }}
+          RUN_ID: ${{ inputs.maplesu_run_id }}
+          MAPLE_COMMIT: ${{ inputs.maplesu_commit }}
+          ARTIFACT_DIGEST: ${{ inputs.maplesu_artifact_digest }}
+          KERNEL_UAPI: ${{ inputs.maplesu_kernel_uapi }}
+        run: |
+          set -euo pipefail
+          mkdir -p tools/sidecars
+          python3 tools/emit_samsung_sidecar.py \
+            --payload "$PAYLOAD_DIR/ksud-maplesu" --variant maplesu \
+            --commit "${MAPLE_COMMIT:-b3e5057c99b3fba5901cbed6a4140a7d59462d6f}" \
+            --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --kernel-uapi "${KERNEL_UAPI:-6}" \
+            --run-id "${RUN_ID:-45523572248}" \
+            --artifact-id "${ARTIFACT_ID:-14980758843}" \
+            --artifact-digest "${ARTIFACT_DIGEST:-sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2}" \
+            --out "$SIDECAR_DIR/ksud-maplesu.version"
+          python3 tools/emit_samsung_sidecar.py --check \
+            --payload "$PAYLOAD_DIR/ksud-maplesu" --variant maplesu \
+            --out "$SIDECAR_DIR/ksud-maplesu.version"
+          cat "$SIDECAR_DIR/ksud-maplesu.version"
+
+      - name: Verify Samsung payload provenance (four variants)
+        run: |
+          python3 tools/verify_samsung_payloads.py \
+            --payloads "$PAYLOAD_DIR" --sidecars "$SIDECAR_DIR"
+
+      - name: Regenerate the payload manifest from the bundled payloads
+        run: |
+          set -euo pipefail
+          python3 tools/gen_payload_versions.py \
+            --payloads "$PAYLOAD_DIR" --sidecars "$SIDECAR_DIR" \
+            --max-age-hours 48 --lock-out "$LOCK_FILE" --write --allow-problems
+          cat "$PAYLOAD_DIR/versions.properties"
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install Android SDK / NDK
+        run: |
+          set -e
+          export ANDROID_HOME="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --install "platforms;android-${COMPILE_SDK}" \
+                                "build-tools;${COMPILE_SDK}.0.0" \
+                                "ndk;30.0.16248370"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+
+      - name: Point the Gradle wrapper at a reachable mirror
+        run: |
+          set -euo pipefail
+          props=app/gradle/wrapper/gradle-wrapper.properties
+          test -f "$props"
+          line=$(sed -n 's/^distributionUrl=//p' "$props")
+          dist=${line##*/}; dist=${dist//\\/}
+          chosen=""
+          for base in https://mirrors.cloud.tencent.com/gradle https://mirrors.huaweicloud.com/gradle https://services.gradle.org/distributions; do
+            if curl -fsS --max-time 25 -r 0-1023 -o /dev/null "$base/$dist"; then chosen="$base/$dist"; break; fi
+            echo "::warning::unreachable Gradle host: $base"
+          done
+          test -n "$chosen" || { echo "::error::no reachable Gradle distribution host"; exit 1; }
+          escaped=$(printf '%s' "$chosen" | sed 's/:/\\:/g')
+          sed -i "s|^distributionUrl=.*|distributionUrl=$escaped|" "$props"
+
+      - name: Build debug APK (four payloads bundled)
+        run: |
+          set -e
+          cd app
+          sed -i "s/compileSdk = 37/compileSdk = ${COMPILE_SDK}/" app/build.gradle.kts
+          sed -i "s/ndkVersion = \"30.0.15729638\"/ndkVersion = \"30.0.16248370\"/" app/build.gradle.kts
+          chmod +x gradlew
+          for attempt in 1 2 3 4; do
+            if ./gradlew assembleDebug --no-daemon --stacktrace -Pandroid.experimental.disableCompileSdkChecks=true; then break; fi
+            [ "$attempt" = 4 ] && { echo "::error::gradle failed after 4 attempts"; exit 1; }
+            echo "::warning::gradle attempt $attempt failed - retrying"; sleep 20
+          done
+          test -f app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Prove the APK carries four payloads and the regenerated manifest
+        run: |
+          set -euo pipefail
+          apk="app/app/build/outputs/apk/debug/app-debug.apk"
+          unzip -l "$apk" | grep -E 'assets/payloads/ksud/(ksud|ksud-next|ksud-sukisu|ksud-maplesu|versions.properties)'
+          for f in ksud ksud-next ksud-sukisu ksud-maplesu; do
+            unzip -p "$apk" "assets/payloads/ksud/$f" > "/tmp/apk-$f"
+            test -s "/tmp/apk-$f"
+            echo "$f: $(stat -c%s "/tmp/apk-$f") bytes  sha256 $(sha256sum "/tmp/apk-$f" | cut -d' ' -f1)"
+          done
+          unzip -p "$apk" assets/payloads/ksud/versions.properties > /tmp/apk-versions.properties
+          diff -u "$PAYLOAD_DIR/versions.properties" /tmp/apk-versions.properties
+          cat /tmp/apk-versions.properties
+          cmp "/tmp/apk-ksud-maplesu" "$PAYLOAD_DIR/ksud-maplesu"
+          echo "::notice::APK carries four payloads; the maplesu bundle matches the fed payload byte for byte"
+
+      - name: Stage deliverables and a small summary
+        run: |
+          set -euo pipefail
+          mkdir -p dist summary
+          cp app/app/build/outputs/apk/debug/app-debug.apk "dist/GhostSam_maplesu-debug-$(date -u +%Y%m%d-%H%M).apk"
+          cp "$PAYLOAD_DIR/versions.properties" dist/versions.properties
+          cp "$LOCK_FILE" dist/payloads.lock.json
+          cp "$SIDECAR_DIR/ksud-maplesu.version" dist/ksud-maplesu.version
+          ( cd dist && sha256sum * > checksums.txt && cat checksums.txt )
+          # small artifact: everything a reviewer needs, without the 40 MB APK
+          cp dist/checksums.txt dist/versions.properties dist/payloads.lock.json dist/ksud-maplesu.version summary/
+          sha256sum "$PAYLOAD_DIR/ksud-maplesu" | awk '{print $1"  ksud-maplesu"}' > summary/payload.sha256
+          {
+            echo "{"
+            echo "  \"maplesu_payload_bytes\": $(stat -c%s "$PAYLOAD_DIR/ksud-maplesu"),"
+            echo "  \"maplesu_payload_sha256\": \"$(cut -d' ' -f1 summary/payload.sha256)\","
+            echo "  \"apk_bytes\": $(stat -c%s dist/*.apk),"
+            echo "  \"apk_sha256\": \"$(sha256sum dist/*.apk | cut -d' ' -f1)\","
+            echo "  \"run_id\": \"${GITHUB_RUN_ID}\""
+            echo "}"
+          } > summary/summary.json
+          cat summary/summary.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ghostsam-p5a-summary
+          path: summary/*
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ghostsam-p5a-apk
+          path: dist/*
+          if-no-files-found: error

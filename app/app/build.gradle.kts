@@ -180,7 +180,18 @@ val verifyPayloads by tasks.registering {
         require("ksud/ksud-next")
         require("ksud/ksud-sukisu")
         require("ksud/versions.properties")
-        listOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu").forEach { rel ->
+        // Fourth variant (MapleSU): an OPTIONAL role. Its payload is fed in at build
+        // time from a MapleSU fork run artifact (tools/emit_samsung_sidecar.py +
+        // .github/workflows/p5a-build.yml), because MapleSU publishes no
+        // latest-ksud release yet. Present -> it must be a real ELF and it must be
+        // declared here, otherwise the "unexpected file" manifest check below
+        // rejects it. Absent -> the container simply ships the three live payloads.
+        val maplesuRole = "ksud/ksud-maplesu"
+        val maplesuPresent = payloadsDir.resolve(maplesuRole).isFile
+        if (maplesuPresent) require(maplesuRole)
+        val ksudRoles = mutableListOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu")
+        if (maplesuPresent) ksudRoles += maplesuRole
+        ksudRoles.forEach { rel ->
             val f = payloadsDir.resolve(rel)
             if (f.isFile && f.length() >= 4) {
                 val magic = f.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
