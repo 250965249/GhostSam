@@ -227,6 +227,13 @@ jobs:
           cmp "/tmp/apk-ksud-maplesu" "$PAYLOAD_DIR/ksud-maplesu"
           echo "::notice::APK carries four payloads; the maplesu bundle matches the fed payload byte for byte"
 
+      - name: Verify the maplesu variant routing (sources + APK)
+        run: |
+          python3 tools/verify_variant_routing.py \
+            --root . \
+            --apk app/app/build/outputs/apk/debug/app-debug.apk \
+            --payload "\/ksud-maplesu"
+
       - name: Stage deliverables and a small summary
         run: |
           set -euo pipefail

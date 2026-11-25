@@ -18,6 +18,7 @@
         <package android:name="com.rifsxd.ksunext" />
         <package android:name="com.sukisu.nova" />
         <package android:name="com.sukisu.ultra" />
+        <package android:name="dev.maplesu.manager" />
         <package android:name="moe.shizuku.manager" />
           <!-- KernelSU-Next "-spoofed" builds use a random package name: cert scanning needs the launcher app set to be visible -->
         <intent>

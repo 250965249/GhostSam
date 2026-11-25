@@ -6,13 +6,18 @@ package com.snothin.ghostsam.data.prefs
 enum class KsudVariant {
     Default,
     Next,
-    SukiSU;
+    SukiSU,
+
+    /** Fourth variant: MapleSU. Appended last on purpose - the stored pref and the
+     *  settings dropdown index by ordinal, so existing installs keep their selection. */
+    MapleSU;
 
     val label: String
         get() = when (this) {
             Default -> "KernelSU"
             Next -> "KernelSU-Next"
             SukiSU -> "SukiSU-Nova"
+            MapleSU -> "MapleSU"
         }
 
     companion object {
