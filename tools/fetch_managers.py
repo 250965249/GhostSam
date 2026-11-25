@@ -44,7 +44,7 @@ from github_ci import full_revision, provenance, resolve_ci
 #: Owner of VARIANTS/PROVISIONAL: the "registered but producer offline" set has
 #: exactly one definition there, and this module reads it instead of keeping a
 #: private copy that could drift.
-from gen_payload_versions import PROVISIONAL
+from gen_payload_versions import MANAGER_SOURCE_MISSING, PROVISIONAL
 
 SPEC: dict[str, dict] = {
     "default": {
@@ -541,6 +541,20 @@ def main(argv: list[str]) -> int:
                 f"::warning::{variant}: provisional variant - {spec['repo']} has no "
                 "release channel yet; skipped (drop it from "
                 "gen_payload_versions.PROVISIONAL once the producer publishes)"
+            )
+            continue
+        if variant in MANAGER_SOURCE_MISSING:
+            # The payload is real and bundled, but the manager is a download we have
+            # no source for yet: no release, and no earlier GhostSam release carries
+            # GhostSam-manager-<variant>.apk, so carry_over() cannot help either.
+            # Warn with the exact gap and keep the other managers coming; the release
+            # gate still requires the APK once the variant joins the publication set.
+            print(
+                f"::warning::{variant}: manager source missing - {spec['repo']} has no "
+                "downloadable manager APK and no earlier GhostSam release carries "
+                f"{spec['out']}; the payload is bundled but the manager slot is empty "
+                "(drop it from gen_payload_versions.MANAGER_SOURCE_MISSING once the "
+                "official APK is available)"
             )
             continue
         try:

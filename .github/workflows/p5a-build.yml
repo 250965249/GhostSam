@@ -19,20 +19,20 @@ on:
   workflow_dispatch:
     inputs:
       maplesu_artifact_id:
-        description: "MapleSU Actions artifact id holding libksud_ksu.so"
-        default: "14980758843"
+        description: "MapleSU Actions artifact id holding the ksud payload (default: identity build 45575513087)"
+        default: "15004182306"
       maplesu_payload_member:
         description: "ksud payload path inside the artifact zip"
         default: "libksud_ksu.so"
       maplesu_run_id:
         description: "producer run id recorded in the receipt"
-        default: "45523572248"
+        default: "45575513087"
       maplesu_commit:
         description: "MapleSU commit the artifact was built from"
-        default: "b3e5057c99b3fba5901cbed6a4140a7d59462d6f"
+        default: "e8676cac90d962751b588445c13f8eb60dde81cb"
       maplesu_artifact_digest:
         description: "artifact digest from the Actions API (sha256:...)"
-        default: "sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2"
+        default: "sha256:b084000bb5fc1f932f7addbc00755c8a3176bfda22625cf9c8c091e03a1d38da"
       maplesu_kernel_uapi:
         description: "kernel UAPI the payload was built against (the t10 manifest records identity.uapiVersion = 7, not 6)"
         default: "7"
@@ -94,11 +94,11 @@ jobs:
           KERNEL_UAPI: ${{ inputs.maplesu_kernel_uapi }}
         run: |
           set -euo pipefail
-          ARTIFACT_ID="${ARTIFACT_ID:-14980758843}"
+          ARTIFACT_ID="${ARTIFACT_ID:-15004182306}"
           MEMBER="${MEMBER:-libksud_ksu.so}"
-          RUN_ID="${RUN_ID:-45523572248}"
-          MAPLE_COMMIT="${MAPLE_COMMIT:-b3e5057c99b3fba5901cbed6a4140a7d59462d6f}"
-          ARTIFACT_DIGEST="${ARTIFACT_DIGEST:-sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2}"
+          RUN_ID="${RUN_ID:-45575513087}"
+          MAPLE_COMMIT="${MAPLE_COMMIT:-e8676cac90d962751b588445c13f8eb60dde81cb}"
+          ARTIFACT_DIGEST="${ARTIFACT_DIGEST:-sha256:b084000bb5fc1f932f7addbc00755c8a3176bfda22625cf9c8c091e03a1d38da}"
           KERNEL_UAPI="${KERNEL_UAPI:-7}"
           out="$PAYLOAD_DIR/ksud-maplesu"
 
@@ -139,12 +139,12 @@ jobs:
           mkdir -p tools/sidecars
           python3 tools/emit_samsung_sidecar.py \
             --payload "$PAYLOAD_DIR/ksud-maplesu" --variant maplesu \
-            --commit "${MAPLE_COMMIT:-b3e5057c99b3fba5901cbed6a4140a7d59462d6f}" \
+            --commit "${MAPLE_COMMIT:-e8676cac90d962751b588445c13f8eb60dde81cb}" \
             --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --kernel-uapi "${KERNEL_UAPI:-7}" \
-            --run-id "${RUN_ID:-45523572248}" \
-            --artifact-id "${ARTIFACT_ID:-14980758843}" \
-            --artifact-digest "${ARTIFACT_DIGEST:-sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2}" \
+            --run-id "${RUN_ID:-45575513087}" \
+            --artifact-id "${ARTIFACT_ID:-15004182306}" \
+            --artifact-digest "${ARTIFACT_DIGEST:-sha256:b084000bb5fc1f932f7addbc00755c8a3176bfda22625cf9c8c091e03a1d38da}" \
             --out "$SIDECAR_DIR/ksud-maplesu.version"
           python3 tools/emit_samsung_sidecar.py --check \
             --payload "$PAYLOAD_DIR/ksud-maplesu" --variant maplesu \

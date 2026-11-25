@@ -66,12 +66,12 @@ VARIANTS: dict[str, dict[str, str]] = {
         "source": "250965249/SukiSU-Ultra",
         "release_tag": "latest-ksud",
     },
-    # Fourth slot, registered ahead of its producer: 250965249/MapleSU (the
-    # Samsung-side fork of FengQiuFQ/MapleSU) has no `latest-ksud` release and no
-    # `ksud-maplesu-aarch64` payload yet, so this entry is inert and is listed in
-    # PROVISIONAL below. The key, file name, display name and producer source are
-    # the values the rest of the chain (verify_samsung_payloads.PRODUCERS,
-    # fetch_managers.SPEC, render_release_notes.ORDER) already addresses.
+    # Fourth slot. MapleSU publishes no `latest-ksud` release, so the payload is not
+    # fetched at build time: it is bundled from the MapleSU identity build (run
+    # 45575513087) and its receipt is committed as
+    # tools/sidecars/ksud-maplesu.version (see tools/emit_samsung_sidecar.py).
+    # `release_tag` stays so the slot behaves like the other three the moment MapleSU
+    # publishes that release.
     "maplesu": {
         "file": "ksud-maplesu",
         "display": "MapleSU",
@@ -81,13 +81,19 @@ VARIANTS: dict[str, dict[str, str]] = {
 }
 
 #: Single source of truth for "registered, but the producer has not published the
-#: Samsung payload chain yet" (currently the fourth slot only). Every consumer
-#: imports this set instead of repeating the literal: verify_samsung_payloads and
-#: fetch_managers both read it from here. A variant in this set is skipped only
-#: while *both* its payload and its sidecar are absent; a missing payload for it
-#: is a warning, not a problem, and the lock records an explicit `provisional`
-#: entry so nothing downstream has to infer the state from a repository name.
-PROVISIONAL = {"maplesu"}
+#: Samsung payload chain yet". It is EMPTY: the maplesu payload is now bundled in
+#: this branch (fed from the MapleSU identity build, run 45575513087) and its
+#: receipt is committed as tools/sidecars/ksud-maplesu.version, so
+#: verify_samsung_payloads enforces the full contract for it like the other three.
+PROVISIONAL: set[str] = set()
+
+#: Variants whose *manager* channel still has no APK source GhostSam can download.
+#: Their payload is real and bundled, but fetch_managers has nothing to fetch and no
+#: earlier GhostSam release to carry over, so it skips them with a truthful warning
+#: instead of failing the job. Deliberately separate from PROVISIONAL: the payload
+#: contract and the manager contract are two different gates and only the payload
+#: one is closed.
+MANAGER_SOURCE_MISSING = {"maplesu"}
 
 MANIFEST_NAME = "versions.properties"
 LOCK_NAME = "payloads.lock.json"
@@ -228,11 +234,25 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
                 continue
             problems.append(f"{variant}: {problem}")
         if info["polluted"] and not sidecar_names_the_build:
-            problems.append(
-                f"{variant}: version_name {info['version_name']!r} came from a fork "
-                "release tag and no producer sidecar supplies the real one - the "
-                "producer's ksud build ran `git describe` with `latest-ksud` present"
-            )
+            # Two different situations look alike here. A fork release tag leaking
+            # into `git describe` is a producing-build defect (the receipt would have
+            # named the payload). A tree that simply carries no version tag describes
+            # itself as a bare commit sha, and a receipt that records that same sha is
+            # the producer telling the truth - the label then falls back to the
+            # numeric code, which is honest, so it is a warning rather than a failure.
+            acknowledged = (sidecar.get("version_name") or "").strip() == (info["version_name"] or "").strip()
+            if acknowledged:
+                warnings.append(
+                    f"{variant}: payload stamp {info['version_name']!r} is a bare commit sha "
+                    "(the tree carries no version tag) and the producer receipt records the "
+                    "same value - the label falls back to the numeric code"
+                )
+            else:
+                problems.append(
+                    f"{variant}: version_name {info['version_name']!r} came from a fork "
+                    "release tag and no producer sidecar supplies the real one - the "
+                    "producer's ksud build ran `git describe` with `latest-ksud` present"
+                )
         if info["version_code"] is None:
             problems.append(f"{variant}: no version code stamped in the payload")
 

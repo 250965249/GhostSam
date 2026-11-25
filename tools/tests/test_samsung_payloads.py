@@ -10,7 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from verify_samsung_payloads import verify
-from gen_payload_versions import VARIANTS, build_report, render_manifest
+from gen_payload_versions import MANAGER_SOURCE_MISSING, PROVISIONAL, VARIANTS, build_report, render_manifest
 from render_release_notes import changes_section, sync_cell
 
 VARIANT = "sukisu"
@@ -101,9 +101,27 @@ class SamsungPayloadTests(unittest.TestCase):
     def test_provisional_variant_is_skipped_while_its_producer_is_offline(self):
         # 250965249/MapleSU publishes no payload and no sidecar yet: the slot is
         # registered, so verify() must not fail the live variants over it.
+        # maplesu left PROVISIONAL when its payload was bundled, so the mechanism is
+        # exercised by forcing the set for the duration of the test.
+        with patch("gen_payload_versions.PROVISIONAL", {"maplesu"}), \
+             patch("verify_samsung_payloads.PROVISIONAL", {"maplesu"}):
+            del self.blobs[VARIANTS[MAPLESU_VARIANT]["file"]]
+            del self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]
+            self.assertEqual([], verify(self.payloads, self.sidecars))
+
+    def test_maplesu_left_the_provisional_set_when_its_payload_arrived(self):
+        # Production state on this branch: the payload + receipt are bundled, so the
+        # fourth slot is enforced like the other three. The manager channel is a
+        # separate, still-open gate.
+        self.assertNotIn(MAPLESU_VARIANT, PROVISIONAL)
+        self.assertIn(MAPLESU_VARIANT, MANAGER_SOURCE_MISSING)
+        # ... and a missing maplesu payload is a hard problem now, not a skip.
         del self.blobs[VARIANTS[MAPLESU_VARIANT]["file"]]
-        del self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]
-        self.assertEqual([], verify(self.payloads, self.sidecars))
+        problems = verify(self.payloads, self.sidecars)
+        self.assertTrue(
+            any(p.startswith(f"{MAPLESU_VARIANT} (250965249/MapleSU): payload missing") for p in problems),
+            problems,
+        )
 
     def test_provisional_variant_is_enforced_as_soon_as_a_payload_exists(self):
         # Half a pair is a defect, not a pending slot: a payload without its
@@ -135,14 +153,16 @@ class SamsungPayloadTests(unittest.TestCase):
     def test_skipped_provisional_variant_is_marked_in_the_lock(self):
         # The lock must carry an explicit marker for a registered-but-unpublished
         # slot, and the manifest must stay byte-identical while it is offline.
-        del self.blobs[VARIANTS[MAPLESU_VARIANT]["file"]]
-        del self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]
-        report = self._report()
-        self.assertIs(report["variants"][MAPLESU_VARIANT]["provisional"], True)
-        self.assertIn(MAPLESU_VARIANT, report["provisional"])
-        self.assertIn("publishes neither", report["provisional"][MAPLESU_VARIANT])
-        self.assertNotIn(f"{MAPLESU_VARIANT}=", render_manifest(report))
-        self.assertEqual([], report["problems"])
+        # maplesu is published on this branch, so force the provisional set.
+        with patch("gen_payload_versions.PROVISIONAL", {"maplesu"}):
+            del self.blobs[VARIANTS[MAPLESU_VARIANT]["file"]]
+            del self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]
+            report = self._report()
+            self.assertIs(report["variants"][MAPLESU_VARIANT]["provisional"], True)
+            self.assertIn(MAPLESU_VARIANT, report["provisional"])
+            self.assertIn("publishes neither", report["provisional"][MAPLESU_VARIANT])
+            self.assertNotIn(f"{MAPLESU_VARIANT}=", render_manifest(report))
+            self.assertEqual([], report["problems"])
 
     def test_sync_cell_reads_the_marker_not_the_repository_name(self):
         # Four complete variants: the slot is live, so the notes must report the
@@ -162,23 +182,25 @@ class SamsungPayloadTests(unittest.TestCase):
         # provisional short-circuit, changes_section() announced "MapleSU 新增" in
         # every release after the first, because the previous lock also carried the
         # stub. Nothing changed here, so the "no payload movement" sentence stands.
-        del self.blobs[VARIANTS[MAPLESU_VARIANT]["file"]]
-        del self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]
-        lock = self._report()
-        self.assertIs(lock["variants"][MAPLESU_VARIANT]["provisional"], True)
+        # maplesu is published on this branch, so force the provisional set.
+        with patch("gen_payload_versions.PROVISIONAL", {"maplesu"}):
+            del self.blobs[VARIANTS[MAPLESU_VARIANT]["file"]]
+            del self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]
+            lock = self._report()
+            self.assertIs(lock["variants"][MAPLESU_VARIANT]["provisional"], True)
 
-        # (a) previous release built with the same stub in it
-        previous = json.loads(json.dumps(lock))
-        rows = changes_section(lock, previous)
-        self.assertEqual(["本次没有载荷变化（上游未推送新提交）。"], rows)
-        self.assertNotIn("新增", "\n".join(rows))
+            # (a) previous release built with the same stub in it
+            previous = json.loads(json.dumps(lock))
+            rows = changes_section(lock, previous)
+            self.assertEqual(["本次没有载荷变化（上游未推送新提交）。"], rows)
+            self.assertNotIn("新增", "\n".join(rows))
 
-        # (b) previous release published before the slot was registered at all
-        pre_merge = json.loads(json.dumps(lock))
-        del pre_merge["variants"][MAPLESU_VARIANT]
-        rows = changes_section(lock, pre_merge)
-        self.assertNotIn("新增", "\n".join(rows))
-        self.assertEqual(["本次没有载荷变化（上游未推送新提交）。"], rows)
+            # (b) previous release published before the slot was registered at all
+            pre_merge = json.loads(json.dumps(lock))
+            del pre_merge["variants"][MAPLESU_VARIANT]
+            rows = changes_section(lock, pre_merge)
+            self.assertNotIn("新增", "\n".join(rows))
+            self.assertEqual(["本次没有载荷变化（上游未推送新提交）。"], rows)
 
     def test_changes_section_still_reports_a_real_version_movement(self):
         # The provisional guard must not silence the published variants.
@@ -189,6 +211,40 @@ class SamsungPayloadTests(unittest.TestCase):
         rows = changes_section(lock, previous)
         self.assertTrue(any("SukiSU-Nova" in row and "→" in row for row in rows), rows)
         self.assertNotIn("新增", "\n".join(rows))
+
+    def _polluted_probe(self, name="e8676ca"):
+        """probe() that reports a bare-sha stamp for maplesu and the fixture values for
+        the other variants (a blanket fake would make their sidecars mismatch)."""
+        base = self._fake_probe
+
+        def probe(path, variant=None):
+            if variant != MAPLESU_VARIANT:
+                return base(path, variant)
+            return {"path": str(path), "size": 1, "variant": variant,
+                    "version_code": MAPLESU_CODE, "version_name": name,
+                    "tag": name, "distance": 0, "commit": None, "commit_count": None,
+                    "polluted": True, "checksum": None, "problems": []}
+        return probe
+
+    def test_bare_sha_stamp_acknowledged_by_the_receipt_is_only_a_warning(self):
+        # The MapleSU identity build carries no version tag, so its stamp is a bare
+        # commit sha. When the receipt records that same sha the producer is telling
+        # the truth: label falls back to the numeric code, no failure.
+        self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]["version_name"] = "e8676ca"
+        with patch("gen_payload_versions.probe", self._polluted_probe()):
+            report = self._report()
+        self.assertEqual([], report["problems"])
+        self.assertTrue(any("bare commit sha" in w for w in report["warnings"]), report["warnings"])
+        self.assertIn(f"{MAPLESU_VARIANT}=MapleSU ({MAPLESU_CODE})", render_manifest(report))
+
+    def test_unacknowledged_polluted_stamp_stays_a_problem(self):
+        # Polluted stamp and a receipt that names nothing: that remains the
+        # fork-release-tag hazard the check exists for. (A receipt carrying a clean
+        # version name wins over the stamp by design, so it is not this case.)
+        self.metadata[f"ksud-{MAPLESU_VARIANT}.version"]["version_name"] = ""
+        with patch("gen_payload_versions.probe", self._polluted_probe()):
+            report = self._report()
+        self.assertTrue(any("came from a fork release tag" in p for p in report["problems"]), report["problems"])
 
     def test_official_release_cannot_replace_samsung_payload(self):
         self.metadata[f"ksud-{VARIANT}.version"]["source"] = "official-release"
