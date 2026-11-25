@@ -38,7 +38,7 @@ on:
         default: "7"
 
 permissions:
-  contents: read
+  contents: write
   actions: read
 
 env:
@@ -256,6 +256,30 @@ jobs:
             echo "}"
           } > summary/summary.json
           cat summary/summary.json
+
+      - name: Attach the APK to the v0.4.0-maplesu-beta release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="v0.4.0-maplesu-beta"
+          # 主人 created this release (id 457977059, prerelease, tag on this branch).
+          # This step only attaches assets to it: it never creates or edits a release,
+          # and --clobber only replaces files this workflow uploaded before.
+          for attempt in 1 2 3; do
+            if gh release upload "$tag" dist/*.apk dist/checksums.txt dist/versions.properties \
+                 dist/payloads.lock.json dist/ksud-maplesu.version --clobber; then
+              break
+            fi
+            if [ "$attempt" = 3 ]; then
+              echo "::error::release upload failed after 3 attempts"
+              exit 1
+            fi
+            echo "::warning::release upload attempt $attempt failed - retrying in 10s"
+            sleep 10
+          done
+          gh release view "$tag" --json url,assets \
+            --jq '.url, (.assets[] | "\(.name) \(.size) \(.browser_download_url)")'
 
       - uses: actions/upload-artifact@v7
         with:
