@@ -34,8 +34,8 @@ on:
         description: "artifact digest from the Actions API (sha256:...)"
         default: "sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2"
       maplesu_kernel_uapi:
-        description: "kernel UAPI the payload was built against"
-        default: "6"
+        description: "kernel UAPI the payload was built against (the t10 manifest records identity.uapiVersion = 7, not 6)"
+        default: "7"
 
 permissions:
   contents: read
@@ -99,7 +99,7 @@ jobs:
           RUN_ID="${RUN_ID:-45523572248}"
           MAPLE_COMMIT="${MAPLE_COMMIT:-b3e5057c99b3fba5901cbed6a4140a7d59462d6f}"
           ARTIFACT_DIGEST="${ARTIFACT_DIGEST:-sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2}"
-          KERNEL_UAPI="${KERNEL_UAPI:-6}"
+          KERNEL_UAPI="${KERNEL_UAPI:-7}"
           out="$PAYLOAD_DIR/ksud-maplesu"
 
           if [ -s "$out" ]; then
@@ -120,18 +120,7 @@ jobs:
             got=$(sha256sum "$work/artifact.zip" | cut -d' ' -f1)
             echo "artifact sha256 $got"
             test "sha256:$got" = "$ARTIFACT_DIGEST" || { echo "::error::artifact digest differs from the receipt: $got"; exit 1; }
-            python3 - "$work/artifact.zip" "$work" "$MEMBER" <<'PY'
-import sys, zipfile
-archive, dest, member = sys.argv[1], sys.argv[2], sys.argv[3]
-with zipfile.ZipFile(archive) as z:
-    names = z.namelist()
-    hit = [n for n in names if n == member or n.endswith("/" + member)]
-    if len(hit) != 1:
-        raise SystemExit(f"expected exactly one {member} in the artifact, found {hit[:5]} of {len(names)} entries")
-    with z.open(hit[0]) as src, open(f"{dest}/payload.bin", "wb") as dst:
-        dst.write(src.read())
-print("extracted", hit[0])
-PY
+            python3 tools/extract_artifact_member.py "$work/artifact.zip" "$MEMBER" "$work/payload.bin"
             install -m 0644 "$work/payload.bin" "$out"
           fi
           stat -c '%n %s bytes' "$out"
@@ -152,7 +141,7 @@ PY
             --payload "$PAYLOAD_DIR/ksud-maplesu" --variant maplesu \
             --commit "${MAPLE_COMMIT:-b3e5057c99b3fba5901cbed6a4140a7d59462d6f}" \
             --built-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --kernel-uapi "${KERNEL_UAPI:-6}" \
+            --kernel-uapi "${KERNEL_UAPI:-7}" \
             --run-id "${RUN_ID:-45523572248}" \
             --artifact-id "${ARTIFACT_ID:-14980758843}" \
             --artifact-digest "${ARTIFACT_DIGEST:-sha256:83a4e976f86a706312e7e4a160267d8cfe7330fb0c7f541673abeeb657009ef2}" \
