@@ -157,8 +157,8 @@ jobs:
           # even when its version label is newer.
           fetch_gh 250965249/SukiSU-Ultra latest-ksud \
                    ksud-sukisu-aarch64 "$base/ksud-sukisu"
-          # MapleSU standard variant (4th producer): fixed 32650 stamp, source-declared pin.
-          fetch_gh FengQiuFQ/MapleSU latest-ksud \
+          # MapleSU standard variant (4th producer): fixed 32650 stamp, source-declared pin (fork 250965249/MapleSU is the only writable producer; t40-F4).
+          fetch_gh 250965249/MapleSU latest-ksud \
                    ksud-maplesu-aarch64 "$base/ksud-maplesu"
 
           sidecar() { # $1=variant $2=repo
@@ -176,7 +176,7 @@ jobs:
           sidecar default 250965249/KernelSU
           sidecar next   250965249/KernelSU-Next
           sidecar sukisu 250965249/SukiSU-Ultra
-          sidecar maplesu FengQiuFQ/MapleSU
+          sidecar maplesu 250965249/MapleSU
 
           # A plain `file`-style check is not available on every runner image, so
           # verify the ELF magic and a sane size by hand.

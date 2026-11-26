@@ -24,8 +24,11 @@ from gen_payload_versions import VARIANTS
 from github_ci import full_revision
 from verify_manager_apks import MANAGERS
 
+# Manager provenance repository per variant. maplesu's manager is a fork Actions
+# artifact (250965249/MapleSU ghostsam-build.yml, public test keystore), not the
+# upstream MapleSU release CI; the other three keep their official sources.
 OFFICIAL = {"default": "tiann/KernelSU", "next": "KernelSU-Next/KernelSU-Next",
-            "sukisu": "SukiSU-Nova/SukiSU-Nova", "maplesu": "FengQiuFQ/MapleSU"}
+            "sukisu": "SukiSU-Nova/SukiSU-Nova", "maplesu": "250965249/MapleSU"}
 
 
 class PairingError(RuntimeError):
@@ -94,7 +97,22 @@ def verify_pair(variant: str, manager: dict, kernel: dict, api=api_json, uapi_re
 
     # Nova's existing pinned pair remains supported. A new KernelSU/Next CI
     # source must carry a real producer receipt rather than a guessed version.
-    if variant != "sukisu":
+    if variant == "sukisu":
+        if (repository != "250965249/SukiSU-Ultra" or manager.get("kind") != "release"
+                or manager.get("tag") != "v3.0.0"):
+            raise PairingError("sukisu: the existing pinned pair was changed without review")
+    elif variant == "maplesu":
+        # MapleSU follows the sukisu precedent: the 4th-variant manager is a fork
+        # Actions artifact (250965249/MapleSU ghostsam-build.yml, signed with the
+        # public test keystore), so the upstream Samsung auto-sync receipt does not
+        # apply. Bind the manager to the fork provenance instead; identity, UAPI and
+        # source are already enforced above, and no other variant is relaxed.
+        ci = manager.get("ci") or {}
+        if (manager.get("kind") != "ci"
+                or ci.get("repository") != OFFICIAL["maplesu"]
+                or ci.get("workflow") != ".github/workflows/ghostsam-build.yml"):
+            raise PairingError("maplesu: manager is not the fork GhostSam CI artifact")
+    else:
         if kernel.get("build_kind") != "samsung-ci":
             raise PairingError(f"{variant}: Samsung CI producer receipt is missing")
         declared_uapi = positive_integer(kernel.get("kernel_uapi_version"), "producer kernel UAPI")
@@ -135,9 +153,6 @@ def verify_pair(variant: str, manager: dict, kernel: dict, api=api_json, uapi_re
             raise PairingError(f"{variant}: producer artifact identity differs from the receipt")
         if artifact_reader(repository, artifact_id, digest) != kernel.get("sha256"):
             raise PairingError(f"{variant}: APK payload is not the ksud from the verified producer artifact")
-    elif (repository != "250965249/SukiSU-Ultra" or manager.get("kind") != "release"
-          or manager.get("tag") != "v3.0.0"):
-        raise PairingError("sukisu: the existing pinned pair was changed without review")
 
     conflicts = kernel.get("merge_auto_resolved") or ""
     if not isinstance(conflicts, str) or any(p.startswith("kernel/") for p in conflicts.split()):

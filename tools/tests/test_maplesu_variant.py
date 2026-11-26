@@ -15,6 +15,8 @@ from gen_payload_versions import VARIANTS
 from probe_payload_version import VERSION_CODE_OFFSETS, is_polluted, probe
 from verify_samsung_payloads import PRODUCERS, verify
 from verify_manager_apks import MANAGERS
+from fetch_managers import SPEC as FETCH_SPEC
+from verify_manager_pairing import OFFICIAL as PAIR_OFFICIAL, PairingError, verify_pair
 
 
 class MapleSuFixtureTests(unittest.TestCase):
@@ -77,6 +79,72 @@ class MapleSuFixtureTests(unittest.TestCase):
     def test_uapi7_alignment_contract(self):
         # MapleSU manager payload is UAPI 7; the standard variant must declare it, not infer.
         self.assertEqual("7", VARIANTS["maplesu"].get("uapi", "7"))
+
+    # ---- t42 (t40-F4/F5): fetch source must point at the writable fork ----
+    def test_fetch_source_points_to_fork(self):
+        spec = FETCH_SPEC["maplesu"]
+        self.assertEqual("250965249/MapleSU", spec["repo"])
+        self.assertEqual("ghostsam-build.yml", spec["workflow"])
+        self.assertEqual("MapleSU-Manager-ghostsam-test", spec["artifact"])
+        self.assertEqual("GhostSam-manager-MapleSU.apk", spec["out"])
+        # Artifact upload name has no .apk; prefer must still select the inner .apk.
+        self.assertTrue(any(p.search("MapleSU-Manager-ghostsam-test.apk") for p in spec["prefer"]))
+        # The other three variants' fetch sources are untouched.
+        self.assertEqual("tiann/KernelSU", FETCH_SPEC["default"]["repo"])
+        self.assertEqual("KernelSU-Next/KernelSU-Next", FETCH_SPEC["next"]["repo"])
+        self.assertEqual("SukiSU-Nova/SukiSU-Nova", FETCH_SPEC["sukisu"]["repo"])
+
+    def test_auto_build_maplesu_fetch_uses_fork(self):
+        workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/auto-build.yml").read_text(encoding="utf-8")
+        self.assertIn("fetch_gh 250965249/MapleSU latest-ksud", workflow)
+        self.assertIn('ksud-maplesu-aarch64 "$base/ksud-maplesu"', workflow)
+        self.assertIn("sidecar maplesu 250965249/MapleSU", workflow)
+        self.assertNotIn("fetch_gh FengQiuFQ/MapleSU", workflow)
+        self.assertNotIn("sidecar maplesu FengQiuFQ/MapleSU", workflow)
+
+    # ---- t42: pairing accepts the fork Actions manager, other variants unchanged ----
+    def test_pairing_accepts_fork_manager_source(self):
+        self.assertEqual("250965249/MapleSU", PAIR_OFFICIAL["maplesu"])
+        self.assertEqual("tiann/KernelSU", PAIR_OFFICIAL["default"])
+        self.assertEqual("KernelSU-Next/KernelSU-Next", PAIR_OFFICIAL["next"])
+        self.assertEqual("SukiSU-Nova/SukiSU-Nova", PAIR_OFFICIAL["sukisu"])
+        mcommit, kcommit = "a" * 40, "b" * 40
+        m = {
+            "repo": "250965249/MapleSU", "signature_verified": True,
+            "certificate_sha256": MANAGERS["maplesu"]["certificate"],
+            "package": MANAGERS["maplesu"]["package"], "file": MANAGERS["maplesu"]["file"],
+            "ci": {"repository": "250965249/MapleSU",
+                   "workflow": ".github/workflows/ghostsam-build.yml", "commit": mcommit},
+            "kind": "ci", "uapi_version": 7, "version_code": 32650,
+        }
+        k = {"source": "250965249/MapleSU", "commit": kcommit, "version_code": 32650,
+             "kernel_version_code": "32650", "merge_auto_resolved": ""}
+
+        def api(path):
+            left = path.split("/compare/", 1)[1].split("...", 1)[0]
+            return {"behind_by": 0, "merge_base_commit": {"sha": left}}
+
+        result = verify_pair("maplesu", m, k, api, lambda repo, commit: 7)
+        self.assertTrue(result["contract_verified"])
+        # A manager from the unwritable upstream is rejected by the source whitelist.
+        with self.assertRaisesRegex(PairingError, "manager source"):
+            verify_pair("maplesu", {**m, "repo": "FengQiuFQ/MapleSU"}, k, api, lambda r, c: 7)
+        # A manager whose provenance is not the fork GhostSam build is rejected.
+        bad = {**m, "ci": {**m["ci"], "workflow": ".github/workflows/build-manager.yml"}}
+        with self.assertRaisesRegex(PairingError, "fork GhostSam CI artifact"):
+            verify_pair("maplesu", bad, k, api, lambda r, c: 7)
+        # No relaxation for the pre-existing variants: default still rejects a fork repo.
+        dm = {"repo": "250965249/MapleSU", "signature_verified": True,
+              "certificate_sha256": MANAGERS["default"]["certificate"],
+              "package": MANAGERS["default"]["package"], "file": MANAGERS["default"]["file"],
+              "ci": {"commit": mcommit}, "kind": "ci", "uapi_version": 6, "version_code": 32735}
+        dk = {"source": "250965249/KernelSU", "commit": kcommit, "version_code": 32740,
+              "kernel_version_code": "32735", "kernel_uapi_version": "6", "build_kind": "samsung-ci",
+              "producer_run_id": "42", "official_ci_commit": mcommit, "merge_auto_resolved": "",
+              "producer_artifact_id": "99", "producer_artifact_digest": "sha256:" + "d" * 64,
+              "sha256": "c" * 64}
+        with self.assertRaisesRegex(PairingError, "manager source"):
+            verify_pair("default", dm, dk, api, lambda r, c: 6)
 
 
 if __name__ == "__main__":

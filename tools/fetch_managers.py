@@ -68,17 +68,23 @@ SPEC: dict[str, dict] = {
         ],
     },
     "maplesu": {
+        # 4th standard variant. The manager APK is produced by the fork's own
+        # GhostSam build matrix (250965249/MapleSU, ghostsam-build.yml) and signed
+        # with the public test keystore (t38/t40-F4) — not the upstream MapleSU CI.
+        # The upstream FengQiuFQ/MapleSU has no such artifact and is not writable.
+        # GitHub artifact upload name: "MapleSU-Manager-ghostsam-test"
+        # (it contains the file MapleSU-Manager-ghostsam-test.apk).
         "kind": "ci",
-        "repo": "FengQiuFQ/MapleSU",
-        "branch": "main",
-        "workflow": "build-manager.yml",
-        "artifact": "manager",
+        "repo": "250965249/MapleSU",
+        "branch": "ghostsam/adapter",
+        "workflow": "ghostsam-build.yml",
+        "artifact": "MapleSU-Manager-ghostsam-test",
         "out": "GhostSam-manager-MapleSU.apk",
         "display": "MapleSU",
         "prefer": [
-            re.compile(r"-arm64-v8a-release\.apk$"),
-            re.compile(r"-universal-release\.apk$"),
+            re.compile(r"MapleSU-Manager-ghostsam-test\.apk$"),
             re.compile(r"(?<!spoofed)-release\.apk$"),
+            re.compile(r"\.apk$"),
         ],
     },
     "sukisu": {
