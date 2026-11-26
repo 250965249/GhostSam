@@ -23,8 +23,11 @@ class MapleSuFixtureTests(unittest.TestCase):
     def test_registry_entries(self):
         self.assertEqual("ksud-maplesu", VARIANTS["maplesu"]["file"])
         self.assertEqual("MapleSU", VARIANTS["maplesu"]["display"])
-        self.assertEqual("FengQiuFQ/MapleSU", VARIANTS["maplesu"]["source"])
-        self.assertEqual("FengQiuFQ/MapleSU", PRODUCERS["maplesu"])
+        # The Samsung producer receipt whitelist (verify_manager_pairing
+        # samsung_source) only accepts 250965249/* sources: the lock's `source`
+        # must point at the writable fork, not the unwritable upstream.
+        self.assertEqual("250965249/MapleSU", VARIANTS["maplesu"]["source"])
+        self.assertEqual("250965249/MapleSU", PRODUCERS["maplesu"])
         # Fixed 32650 semantics: no offset arithmetic (0 = absolute).
         self.assertEqual(0, VERSION_CODE_OFFSETS["maplesu"])
 

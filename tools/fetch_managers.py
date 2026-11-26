@@ -105,6 +105,12 @@ SPEC: dict[str, dict] = {
 }
 
 DESCRIBE_TAIL = re.compile(r"-\d+-g[0-9a-f]{7,40}$")
+
+#: Repositories whose KERNEL_SU_UAPI_VERSION header does not live at the
+#: KernelSU root path; maps repository -> committed header path.
+UAPI_HEADER_PATHS = {
+    "250965249/MapleSU": "third_party/kernelsu/applied/uapi/supercall.h",
+}
 ASSET_ORDER = (
     re.compile(r"universal-release\.apk$"),
     re.compile(r"(?<!spoofed)-release\.apk$"),
@@ -360,7 +366,11 @@ def parse_uapi(text: str) -> int:
 
 
 def source_uapi(repository: str, revision: str) -> int:
-    data = api_json(f"repos/{repository}/contents/uapi/supercall.h?ref={revision}")
+    # MapleSU commits the Samsung-adapted kernel source under
+    # third_party/kernelsu/applied (the upstream copy stays one level aside), so
+    # its UAPI header is not at the KernelSU root path.
+    path = UAPI_HEADER_PATHS.get(repository, "uapi/supercall.h")
+    data = api_json(f"repos/{repository}/contents/{path}?ref={revision}")
     if data.get("encoding") != "base64":
         raise RuntimeError(f"{repository}@{revision}: UAPI header is unavailable")
     return parse_uapi(base64.b64decode(data["content"]).decode("utf-8"))

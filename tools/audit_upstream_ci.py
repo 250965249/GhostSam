@@ -20,10 +20,10 @@ from github_ci import CiSourceError, full_revision
 
 BASELINES = {
     "maplesu": {
-        "repo": "FengQiuFQ/MapleSU", "branch": "main",
+        "repo": "250965249/MapleSU", "branch": "ghostsam/adapter",
         "anchor": "ff3aa44850ea22717fa811a17831155a85f43445",
-        "official": "FengQiuFQ/MapleSU",
-        "produced_build": "latest-ksud; MapleSU standard variant (source-declared pin placeholder)",
+        "official": "250965249/MapleSU",
+        "produced_build": "latest-ksud; fork ghostsam-build.yml (MapleSU Samsung delta, test-signed)",
     },
     "default": {
         "repo": "250965249/KernelSU", "branch": "samsung",

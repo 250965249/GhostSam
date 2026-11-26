@@ -33,6 +33,7 @@ VARIANTS = {
     "ksud": "default",
     "ksud-next": "next",
     "ksud-sukisu": "sukisu",
+    "ksud-maplesu": "maplesu",
 }
 
 
@@ -58,9 +59,11 @@ def main(argv: list[str]) -> int:
             shell_name = re.sub(rb"^KSU_NO_NEW_PRIVS[0-9]{5}", b"", names[0]).decode()
 
         info = probe(path, variant)
+        # A build without a readable VERSION_NAME literal (MapleSU stamps only the
+        # 5-digit code) probes as None; the shell pipeline agrees on the empty name.
         ok = (
             shell_code == str(info["version_code"])
-            and shell_name == info["version_name"]
+            and (shell_name or None) == info["version_name"]
         )
         print(
             f"{'OK  ' if ok else 'FAIL'} {filename:12} "

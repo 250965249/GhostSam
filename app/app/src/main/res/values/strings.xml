@@ -167,6 +167,7 @@
     <string name="settings_ksud_variant_default">KernelSU</string>
     <string name="settings_ksud_variant_next">KernelSU-Next</string>
     <string name="settings_ksud_variant_sukisu">SukiSU-Nova</string>
+    <string name="settings_ksud_variant_maplesu">MapleSU</string>
     <string name="settings_ksud_variant_summary">Takes effect on the next run, reboot to replace the kernel</string>
     <string name="settings_ksud_variant_locked">Switchable only on DirtyFrag (standalone)</string>
     <string name="settings_ksud_variant_active">Root active · reboot to switch</string>

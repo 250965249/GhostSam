@@ -74,6 +74,7 @@ object KernelSuProbe {
     private const val CACHE_PREFS = "ksu_manager_cache"
     private const val KEY_PACKAGES_NEXT = "packages_next"
     private const val KEY_PACKAGES_SUKISU = "packages_sukisu"
+    private const val KEY_PACKAGES_MAPLESU = "packages_maplesu"
     private const val LOG_TAG = "GhostSam"
 
     private fun loadCache(context: Context) {
@@ -95,6 +96,13 @@ object KernelSuProbe {
                         .sortedBy { if (it == PACKAGE_SUKISU) 0 else 1 }
                 }
             }
+            prefs.getString(KEY_PACKAGES_MAPLESU, null)?.let { raw ->
+                val cached = raw.split(',').filter { it.isNotBlank() }
+                if (cached.isNotEmpty()) {
+                    mapleSuCertPackages = (cached + mapleSuCertPackages).distinct()
+                        .sortedBy { if (it == PACKAGE_MAPLESU) 0 else 1 }
+                }
+            }
         }
     }
 
@@ -103,6 +111,7 @@ object KernelSuProbe {
             context.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE).edit()
                 .putString(KEY_PACKAGES_NEXT, ksuNextCertPackages.joinToString(","))
                 .putString(KEY_PACKAGES_SUKISU, sukisuCertPackages.joinToString(","))
+                .putString(KEY_PACKAGES_MAPLESU, mapleSuCertPackages.joinToString(","))
                 .apply()
         }
     }
@@ -139,6 +148,101 @@ object KernelSuProbe {
             KsudVariant.SukiSU -> sukisuCertPackages = packages
             KsudVariant.MapleSU -> mapleSuCertPackages = packages
             KsudVariant.Default -> Unit
+        }
+    }
+
+    private fun refreshCertPackages(context: Context) {
+        val variant = SettingsPrefs.effectiveKsudVariant(context)
+        val expectedHash = certHash(variant) ?: return
+        loadCache(context)
+        if (isManagerInstalled(context)) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (now - certScanAt < CERT_SCAN_TTL_MS) return
+        certScanAt = now
+        runCatching {
+            val started = android.os.SystemClock.elapsedRealtime()
+            val pm = context.packageManager
+            val resolved = pm.queryIntentActivities(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
+                0,
+            )
+            val packages = resolved.map { it.activityInfo.packageName }.distinct()
+            val spoofCandidates = packages.filter { SPOOFED_PACKAGE_RE.matches(it) }
+            var discovered = certMatches(pm, spoofCandidates, expectedHash)
+            var fullRan = false
+            if (discovered.isEmpty() && now - fullScanAt >= FULL_SCAN_TTL_MS) {
+                fullScanAt = now
+                fullRan = true
+                discovered = certMatches(pm, packages, expectedHash)
+            }
+            if (discovered.isNotEmpty()) {
+                val merged = (discovered + currentPackages(variant)).distinct()
+                    .sortedBy { if (it == primaryPackage(variant)) 0 else 1 }
+                setPackages(variant, merged)
+                persistCache(context)
+            } else if (fullRan) {
+                setPackages(variant, emptyList())
+                persistCache(context)
+            }
+            Log.i(
+                LOG_TAG,
+                "ksu manager scan: variant=$variant launcher=${packages.size} " +
+                    "prefilter=${spoofCandidates.size} full=$fullRan found=${discovered.size} " +
+                    "ms=${android.os.SystemClock.elapsedRealtime() - started}",
+            )
+        }
+    }
+
+    private fun certMatches(
+        pm: PackageManager,
+        packages: List<String>,
+        expectedHash: String,
+    ): List<String> {
+        if (packages.isEmpty()) return emptyList()
+        val pool = Executors.newFixedThreadPool(minOf(4, packages.size))
+        return try {
+            pool.invokeAll(
+                packages.map { pkg -> Callable<String?> { certMatched(pm, pkg, expectedHash) } },
+            ).mapNotNull { runCatching { it.get() }.getOrNull() }
+        } finally {
+            pool.shutdown()
+        }
+    }
+
+    private fun certMatched(pm: PackageManager, pkg: String, expectedHash: String): String? {
+        val info = runCatching {
+            pm.getPackageInfo(
+                pkg,
+                PackageManager.PackageInfoFlags.of(
+                    PackageManager.GET_SIGNING_CERTIFICATES.toLong(),
+                ),
+            )
+        }.getOrNull() ?: return null
+        val signers = info.signingInfo?.apkContentsSigners ?: return null
+        val matched = signers.any { signer ->
+            MessageDigest.getInstance("SHA-256")
+                .digest(signer.toByteArray())
+                .toSha256Hex() == expectedHash
+        }
+        return if (matched) pkg else null
+    }
+
+    private fun ByteArray.toSha256Hex(): String =
+        joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+
+    /** Manager package candidates strictly by effective variant (uapi is not interchangeable;
+     *  a cross-variant fallback lands the user on a manager for another kernel). */
+    fun managerPackageCandidates(context: Context): List<String> {
+        loadCache(context)
+        return when (SettingsPrefs.effectiveKsudVariant(context)) {
+            KsudVariant.Default -> listOf(PACKAGE_KERNELSU)
+            KsudVariant.Next ->
+                if (PACKAGE_KERNELSU_NEXT in ksuNextCertPackages) ksuNextCertPackages
+                else ksuNextCertPackages + PACKAGE_KERNELSU_NEXT
+            KsudVariant.SukiSU ->
+                (sukisuCertPackages + PACKAGE_SUKISU + PACKAGE_SUKISU_LEGACY).distinct()
+            KsudVariant.MapleSU ->
+                (mapleSuCertPackages + PACKAGE_MAPLESU).distinct()
         }
     }
 

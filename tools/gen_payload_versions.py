@@ -63,7 +63,7 @@ VARIANTS: dict[str, dict[str, str]] = {
     "maplesu": {
         "file": "ksud-maplesu",
         "display": "MapleSU",
-        "source": "FengQiuFQ/MapleSU",
+        "source": "250965249/MapleSU",
         "release_tag": "latest-ksud",
     },
     "sukisu": {
