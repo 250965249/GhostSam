@@ -27,6 +27,12 @@ MANAGERS = {
         "package": "com.rifsxd.ksunext",
         "certificate": "79e590113c4c4c0c222978e413a5faa801666957b1212a328e46c00c69821bf7",
     },
+    "maplesu": {
+        "file": "GhostSam-manager-MapleSU.apk",
+        "package": "dev.maplesu.manager",
+        # t38 fork test cert (DER 911, SHA-256). Replaced the source-declared 30bafb57… placeholder.
+        "certificate": "cd0c477bcacc58c694367cb9a2f696d3bfd5de3e0ee8a0e25451cecbf312db90",
+    },
     "sukisu": {
         "file": "GhostSam-manager-SukiSU.apk",
         "package": "com.sukisu.nova",

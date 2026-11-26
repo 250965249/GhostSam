@@ -17,6 +17,8 @@ NEXT_VARIANT = "next"
 NEXT_CODE = 33000
 DEFAULT_VARIANT = "default"
 DEFAULT_CODE = 32680
+MAPLESU_VARIANT = "maplesu"
+MAPLESU_CODE = 32650
 
 
 class SamsungPayloadTests(unittest.TestCase):
@@ -46,6 +48,7 @@ class SamsungPayloadTests(unittest.TestCase):
         add_fixture(VARIANT, CODE, "3.0.0-1-g1234567")
         add_fixture(NEXT_VARIANT, NEXT_CODE, "3.4.2-1-g89abcde")
         add_fixture(DEFAULT_VARIANT, DEFAULT_CODE, "3.3.1-1-gaabbccd")
+        add_fixture(MAPLESU_VARIANT, MAPLESU_CODE, "5.2.1")
 
         for mock in (
             patch.object(Path, "is_file", lambda path: path.name in self.blobs),

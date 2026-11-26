@@ -60,6 +60,12 @@ VARIANTS: dict[str, dict[str, str]] = {
         "source": "250965249/KernelSU-Next",
         "release_tag": "latest-ksud",
     },
+    "maplesu": {
+        "file": "ksud-maplesu",
+        "display": "MapleSU",
+        "source": "FengQiuFQ/MapleSU",
+        "release_tag": "latest-ksud",
+    },
     "sukisu": {
         "file": "ksud-sukisu",
         "display": "SukiSU-Nova",

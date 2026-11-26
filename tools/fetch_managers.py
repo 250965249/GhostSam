@@ -67,6 +67,20 @@ SPEC: dict[str, dict] = {
             re.compile(r"(?<!spoofed)-release\.apk$"),
         ],
     },
+    "maplesu": {
+        "kind": "ci",
+        "repo": "FengQiuFQ/MapleSU",
+        "branch": "main",
+        "workflow": "build-manager.yml",
+        "artifact": "manager",
+        "out": "GhostSam-manager-MapleSU.apk",
+        "display": "MapleSU",
+        "prefer": [
+            re.compile(r"-arm64-v8a-release\.apk$"),
+            re.compile(r"-universal-release\.apk$"),
+            re.compile(r"(?<!spoofed)-release\.apk$"),
+        ],
+    },
     "sukisu": {
         # This manager shares its UAPI with the Samsung producer. The producer's
         # git describe still uses an Ultra tag, so do not infer a Nova release

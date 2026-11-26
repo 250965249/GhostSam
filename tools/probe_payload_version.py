@@ -40,6 +40,8 @@ VERSION_CODE_OFFSETS = {
     "sukisu": 30000 + 996,
     "next": 30000,
     "default": 30000,
+    # MapleSU uses a fixed version code (32650) instead of an offset; 0 means "already absolute".
+    "maplesu": 0,
 }
 
 #: <anchor><5 digit code><version name>

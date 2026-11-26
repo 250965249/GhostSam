@@ -15,6 +15,7 @@ internal object PayloadVersions {
         KsudVariant.Default to "KernelSU (bundled)",
         KsudVariant.Next to "KernelSU-Next (bundled)",
         KsudVariant.SukiSU to "SukiSU-Nova (bundled)",
+        KsudVariant.MapleSU to "MapleSU (bundled)",
     )
 
     fun label(context: Context, variant: KsudVariant): String = runCatching {

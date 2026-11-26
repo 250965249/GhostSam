@@ -179,8 +179,9 @@ val verifyPayloads by tasks.registering {
         require("ksud/ksud")
         require("ksud/ksud-next")
         require("ksud/ksud-sukisu")
+        require("ksud/ksud-maplesu")
         require("ksud/versions.properties")
-        listOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu").forEach { rel ->
+        listOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu", "ksud/ksud-maplesu").forEach { rel ->
             val f = payloadsDir.resolve(rel)
             if (f.isFile && f.length() >= 4) {
                 val magic = f.inputStream().use { input -> ByteArray(4).also { input.read(it) } }

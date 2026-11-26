@@ -191,6 +191,7 @@ Apache-2.0，见 [`LICENSE`](LICENSE)。第三方声明与致谢见 [`NOTICE`](N
 | producer | `250965249/KernelSU-Next` | `samsung` | `KernelSU-Next/KernelSU-Next@dev`（UAPI 6） | variant=`next` |
 | producer | `250965249/KernelSU` | `samsung` | `tiann/KernelSU@main`（UAPI 6） | variant=`default` |
 | producer | `250965249/SukiSU-Ultra` | `samsung` | `SukiSU-Nova/SukiSU-Nova@main` | variant=`sukisu` |
+| producer | `FengQiuFQ/MapleSU` | `main` | `tiann/KernelSU@main`（UAPI 7） | variant=`maplesu` |
 
 > 表中上游 ref 为稳定示例基线；具体 HEAD、版本号、run id 一律**以仓库当前状态为准**（这类值变化快，不在文档写死）。
 

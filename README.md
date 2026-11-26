@@ -213,6 +213,7 @@ The fork splits "Samsung-adapted kernel builds" from "APK packaging" into a prod
 | producer | `250965249/KernelSU-Next` | `samsung` | `KernelSU-Next/KernelSU-Next@dev` (UAPI 6) | variant=`next` |
 | producer | `250965249/KernelSU` | `samsung` | `tiann/KernelSU@main` (UAPI 6) | variant=`default` |
 | producer | `250965249/SukiSU-Ultra` | `samsung` | `SukiSU-Nova/SukiSU-Nova@main` | variant=`sukisu` |
+| producer | `FengQiuFQ/MapleSU` | `main` | `tiann/KernelSU@main` (UAPI 7) | variant=`maplesu` |
 
 > Upstream refs above are stable example baselines; exact HEADs, version numbers and run ids are always **subject to the repository's current state** (these move fast and are not hard-coded in the docs).
 

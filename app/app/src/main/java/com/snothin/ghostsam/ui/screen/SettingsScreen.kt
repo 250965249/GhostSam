@@ -417,6 +417,7 @@ private fun LazyListScope.SchemeBlock(
                         PayloadVersions.label(context, KsudVariant.Next),
                     stringResource(R.string.settings_ksud_variant_sukisu) + " · " +
                         PayloadVersions.label(context, KsudVariant.SukiSU),
+                    "MapleSU · " + PayloadVersions.label(context, KsudVariant.MapleSU),
                 ),
                 startAction = {
                     Icon(

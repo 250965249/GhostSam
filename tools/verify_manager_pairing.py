@@ -24,7 +24,8 @@ from gen_payload_versions import VARIANTS
 from github_ci import full_revision
 from verify_manager_apks import MANAGERS
 
-OFFICIAL = {"default": "tiann/KernelSU", "next": "KernelSU-Next/KernelSU-Next", "sukisu": "SukiSU-Nova/SukiSU-Nova"}
+OFFICIAL = {"default": "tiann/KernelSU", "next": "KernelSU-Next/KernelSU-Next",
+            "sukisu": "SukiSU-Nova/SukiSU-Nova", "maplesu": "FengQiuFQ/MapleSU"}
 
 
 class PairingError(RuntimeError):

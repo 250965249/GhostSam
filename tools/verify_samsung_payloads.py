@@ -21,6 +21,7 @@ PRODUCERS = {
     "default": "250965249/KernelSU",
     "next": "250965249/KernelSU-Next",
     "sukisu": "250965249/SukiSU-Ultra",
+    "maplesu": "FengQiuFQ/MapleSU",
 }
 
 

@@ -18,6 +18,9 @@
         <package android:name="com.rifsxd.ksunext" />
         <package android:name="com.sukisu.nova" />
         <package android:name="com.sukisu.ultra" />
+        <!-- MapleSU Normal manager (t12 minimal wiring): needed for Android 11+ package visibility
+             so getLaunchIntentForPackage / cert scan can see dev.maplesu.manager. -->
+        <package android:name="dev.maplesu.manager" />
         <package android:name="moe.shizuku.manager" />
           <!-- KernelSU-Next "-spoofed" builds use a random package name: cert scanning needs the launcher app set to be visible -->
         <intent>

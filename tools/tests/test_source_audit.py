@@ -51,7 +51,7 @@ class SourceAuditTests(unittest.TestCase):
             raise RuntimeError('header download failed')
         report = self.source_report(failed)
         self.assertFalse(report['audit_complete'])
-        self.assertEqual(2, len(report['retrieval_errors']))
+        self.assertEqual(3, len(report['retrieval_errors']))  # default/next/sukisu/maplesu -> 3 after one ok
         for entry in report['variants'].values():
             self.assertEqual('unavailable', entry['uapi_status'])
             self.assertIsNone(entry['uapi_compatible'])
