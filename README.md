@@ -209,7 +209,7 @@ The fork splits "Samsung-adapted kernel builds" from "APK packaging" into a prod
 
 | Role | Repository | Branch | Synced upstream (baseline example) | Current baseline example |
 | --- | --- | --- | --- | --- |
-| consumer | `250965249/GhostSam` | `bakasu` | — | consumes all three variants into the APK |
+| consumer | `250965249/GhostSam` | `Ci` | — | consumes all three variants into the APK |
 | producer | `250965249/KernelSU-Next` | `samsung` | `KernelSU-Next/KernelSU-Next@dev` (UAPI 6) | variant=`next` |
 | producer | `250965249/KernelSU` | `samsung` | `tiann/KernelSU@main` (UAPI 6) | variant=`default` |
 | producer | `250965249/SukiSU-Ultra` | `samsung` | `SukiSU-Nova/SukiSU-Nova@main` | variant=`sukisu` |

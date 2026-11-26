@@ -187,7 +187,7 @@ Apache-2.0，见 [`LICENSE`](LICENSE)。第三方声明与致谢见 [`NOTICE`](N
 
 | 角色 | 仓库 | 分支 | 同步上游（基线示例） | 当前基线示例 |
 | --- | --- | --- | --- | --- |
-| 消费端 | `250965249/GhostSam` | `bakasu` | — | 消费三变体产物出 APK |
+| 消费端 | `250965249/GhostSam` | `Ci` | — | 消费三变体产物出 APK |
 | producer | `250965249/KernelSU-Next` | `samsung` | `KernelSU-Next/KernelSU-Next@dev`（UAPI 6） | variant=`next` |
 | producer | `250965249/KernelSU` | `samsung` | `tiann/KernelSU@main`（UAPI 6） | variant=`default` |
 | producer | `250965249/SukiSU-Ultra` | `samsung` | `SukiSU-Nova/SukiSU-Nova@main` | variant=`sukisu` |

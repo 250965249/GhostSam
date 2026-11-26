@@ -23,7 +23,7 @@ on:
   # active, so a push that touches .github/ci-trigger is the reliable "run now"
   # button. Nothing else in the tree triggers a build.
   push:
-    branches: [bakasu]
+    branches: [Ci]
     paths:
       - '.github/ci-trigger'
   workflow_dispatch:
@@ -84,7 +84,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: bakasu
+          ref: Ci
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -95,10 +95,10 @@ jobs:
           git remote add upstream https://github.com/snothin/GhostSam.git
           git fetch upstream main
           if git merge --no-edit upstream/main; then
-            git push origin HEAD:bakasu
+            git push origin HEAD:Ci
           else
             git merge --abort
-            echo "::warning::GhostSam upstream merge has conflicts; building the current bakasu branch instead."
+            echo "::warning::GhostSam upstream merge has conflicts; building the current Ci branch instead."
           fi
 
       - name: Freeze the source commit for all build jobs

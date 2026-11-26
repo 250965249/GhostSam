@@ -2,7 +2,7 @@ name: Verify runtime compatibility
 
 on:
   pull_request:
-    branches: [bakasu]
+    branches: [Ci]
   workflow_dispatch:
 
 permissions:

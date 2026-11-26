@@ -2,7 +2,7 @@ name: Audit upstream CI managers
 
 on:
   pull_request:
-    branches: [bakasu]
+    branches: [Ci]
     paths:
       - 'tools/github_ci.py'
       - 'tools/fetch_managers.py'
