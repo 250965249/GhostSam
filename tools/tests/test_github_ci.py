@@ -39,6 +39,26 @@ class CiIdentityTests(unittest.TestCase):
     def select(self, runs, **kwargs):
         return select_run(runs, REPO, "main", "build-manager.yml", **kwargs)
 
+    def test_resolve_ci_branch_query_keeps_the_slash_literal(self):
+        # GitHub's workflow-runs `branch` filter never matches a %2F-encoded
+        # slash (ghostsam/adapter: zero runs encoded, twelve literal). The
+        # listing URL must carry the branch's slash unencoded.
+        captured: list[str] = []
+
+        def api(path: str):
+            captured.append(path)
+            if "/workflows/" in path:
+                return {"workflow_runs": [run(head_branch="ghostsam/adapter",
+                                              head_repository={"full_name": "250965249/MapleSU"},
+                                              path=".github/workflows/ghostsam-build.yml")],
+                        "total_count": 1}
+            return {"artifacts": [artifact()], "total_count": 1}
+
+        resolve_ci(api, "250965249/MapleSU", "ghostsam/adapter", "ghostsam-build.yml", "manager")
+        self.assertTrue(captured)
+        self.assertIn("branch=ghostsam/adapter&", captured[0])
+        self.assertNotIn("ghostsam%2Fadapter", captured[0])
+
     def test_newest_trusted_completed_run_is_selected(self):
         old = run(id=90, created_at="2026-11-20T08:00:00Z")
         current = run()

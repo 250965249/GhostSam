@@ -108,7 +108,13 @@ def resolve_ci(
     for page in range(1, max_pages + 1):
         data = api(
             f"repos/{repository}/actions/workflows/{encoded}/runs"
-            f"?branch={quote(branch, safe='')}&status=success&per_page=100&page={page}"
+            # GitHub's workflow-runs endpoint has two quirks with a branch that
+            # contains a slash (ghostsam/adapter): a %2F-encoded branch matches
+            # nothing, and `branch=<slashed>&status=success` also returns zero
+            # rows (the branch alone returns twelve). List without the status
+            # filter - eligible_run() re-checks status/conclusion client-side -
+            # and keep the branch slash literal, escaping everything else.
+            f"?branch={quote(branch, safe='/')}&per_page=100&page={page}"
         )
         batch = data.get("workflow_runs") or []
         runs.extend(batch)
