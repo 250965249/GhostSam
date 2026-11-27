@@ -87,11 +87,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: Ci
+          # Build exactly the dispatched ref (workflow_dispatch) or the default branch
+          # (schedule) instead of a hard-coded 'Ci': a manual dispatch on a release branch
+          # must build that branch's commit, otherwise the fix is never compiled.
+          ref: ${{ github.sha }}
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Merge upstream GhostSam main
+      - name: Merge upstream GhostSam main (scheduled builds only)
+        if: ${{ github.event_name == 'schedule' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
