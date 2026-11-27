@@ -178,6 +178,12 @@ def verify_files(apk: Path, managers: Path, variant: str, manager: dict, kernel:
     path = managers / filename
     if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != manager.get("sha256"):
         raise PairingError(f"{variant}: manager changed after signature verification")
+    if kernel.get("disabled"):
+        # Stop-gap: the known-broken ksud binary is intentionally excluded from the shipped
+        # GhostSam APK (the lock marks the variant disabled). Skip ONLY the APK-payload
+        # identity check; the manager APK is still signature-verified and paired with the
+        # kernel source by verify_pair() below.
+        return
     asset = f"assets/payloads/ksud/{VARIANTS[variant]['file']}"
     with zipfile.ZipFile(apk) as archive:
         entries = [entry for entry in archive.infolist() if entry.filename == asset]
