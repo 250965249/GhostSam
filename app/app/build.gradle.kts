@@ -143,6 +143,10 @@ val verifyPayloads by tasks.registering {
     val payloadsDir = layout.projectDirectory.dir("src/main/assets/payloads").asFile
     val seriesTableFile = layout.projectDirectory
         .file("src/main/java/com/snothin/ghostsam/data/device/SeriesTable.kt").asFile
+    // Stop-gap switch (release workflow passes -PmaplesuPayloadEnabled=false): when off,
+    // the known-broken MapleSU ksud payload is neither required nor accepted as bundled,
+    // and it is dropped from the release assets. Default true keeps the 4-variant dev build.
+    val maplesuPayloadEnabled = providers.gradleProperty("maplesuPayloadEnabled").getOrElse("true").toBoolean()
 
     doLast {
         val series = mutableListOf<Pair<String, String>>() // id to kmi
@@ -179,9 +183,11 @@ val verifyPayloads by tasks.registering {
         require("ksud/ksud")
         require("ksud/ksud-next")
         require("ksud/ksud-sukisu")
-        require("ksud/ksud-maplesu")
+        if (maplesuPayloadEnabled) require("ksud/ksud-maplesu")
         require("ksud/versions.properties")
-        listOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu", "ksud/ksud-maplesu").forEach { rel ->
+        val ksudElfAssets = mutableListOf("ksud/ksud", "ksud/ksud-next", "ksud/ksud-sukisu")
+        if (maplesuPayloadEnabled) ksudElfAssets += "ksud/ksud-maplesu"
+        ksudElfAssets.forEach { rel ->
             val f = payloadsDir.resolve(rel)
             if (f.isFile && f.length() >= 4) {
                 val magic = f.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
@@ -204,7 +210,9 @@ val verifyPayloads by tasks.registering {
 
         payloadsDir.walkTopDown().filter { it.isFile }.forEach { f ->
             val rel = f.relativeTo(payloadsDir).path.replace('\\', '/')
-            if (rel !in expected) problems += "unexpected file: $rel (the directory is the manifest; roles are fixed by PackRole)"
+            if (rel !in expected && !(rel == "ksud/ksud-maplesu" && !maplesuPayloadEnabled)) {
+                problems += "unexpected file: $rel (the directory is the manifest; roles are fixed by PackRole)"
+            }
         }
 
         if (problems.isNotEmpty()) {

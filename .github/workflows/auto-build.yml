@@ -44,6 +44,9 @@ env:
   PAYLOAD_DIR: app/app/src/main/assets/payloads/ksud
   SIDECAR_DIR: payloads-sidecars
   LOCK_FILE: payloads.lock.json
+  # Stop-gap release switch: false keeps the maplesu identity/lock entry but marks it DISABLED
+  # and drops the known-broken ksud-maplesu BINARY from the shipped APK. Flip to 'true' to restore.
+  MAPLESU_PAYLOAD_ENABLED: 'false'
   COMPILE_SDK: "36"
 
 jobs:
@@ -314,12 +317,20 @@ jobs:
           sed -i "s/compileSdk = 37/compileSdk = ${COMPILE_SDK}/" app/build.gradle.kts
           sed -i "s/ndkVersion = \"30.0.15729638\"/ndkVersion = \"30.0.16248370\"/" app/build.gradle.kts
           chmod +x gradlew
+          # Stop-gap release: drop the known-broken ksud-maplesu BINARY from the packaged
+          # assets (identity/lock entry is kept, marked DISABLED, so the manager pairing and
+          # GhostSam-manager-MapleSU.apk still work). One env switch restores it.
+          if [ "${MAPLESU_PAYLOAD_ENABLED:-false}" != "true" ]; then
+            rm -f "$GITHUB_WORKSPACE/$PAYLOAD_DIR/ksud-maplesu"
+            echo "::notice::dropped ksud-maplesu from the app assets (stop-gap; versions.properties marks it DISABLED)"
+          fi
           # services.gradle.org has been answering 504 and the wrapper only tries
           # once, so retry the whole invocation - the distribution download
           # resumes on the next attempt.
           for attempt in 1 2 3 4; do
             if ./gradlew assembleRelease --no-daemon --stacktrace \
-                 -Pandroid.experimental.disableCompileSdkChecks=true; then
+                 -Pandroid.experimental.disableCompileSdkChecks=true \
+                 -PmaplesuPayloadEnabled=${MAPLESU_PAYLOAD_ENABLED:-false}; then
               break
             fi
             if [ "$attempt" = 4 ]; then

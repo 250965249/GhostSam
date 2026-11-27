@@ -287,22 +287,22 @@ internal class KsudUpgradeState(
                 // 3) Confirm: module probe; no module but the socket is gone also counts as loaded
                 // (the daemon unlinks it only on the K-success path).
                 log("[i] probing kernel module…")
-                var ok = probeModule(executionMode)
-                if (!ok && !withContext(Dispatchers.IO) { SuDaemonChannel.isAvailable() }) {
-                    log("[i] socket closed by daemon → late-load succeeded")
-                    ok = true
-                }
-                log(if (ok) "[+] module verified" else "[-] module not detected")
-                if (ok) {
+                val moduleActive = probeModule(executionMode)
+                val timedOut = output == null
+                val channelClosed = withContext(Dispatchers.IO) { !SuDaemonChannel.isAvailable() }
+                // "version responded" = the channel is still reachable though the module is not
+                // confirmed active. No extra background probe is started for this signal.
+                val versionResponded = moduleActive || !channelClosed
+                val outcome = classifyKsudUpgradeOutcome(moduleActive, versionResponded, timedOut, channelClosed)
+                log(
+                    if (outcome == KsudUpgradeOutcome.INITIALIZED) "[+] module verified"
+                    else "[-] module not confirmed: ${outcome.message}",
+                )
+                if (outcome.initialized) {
                     finalizeKsudUpgrade()
                 } else {
                     ksudLoadFailed = true
-                    toast(
-                        context.getString(
-                            R.string.ksud_load_failed,
-                            output?.text?.take(160) ?: "channel error",
-                        ),
-                    )
+                    toast(outcome.message)
                 }
             } finally {
                 flushKsudLog()

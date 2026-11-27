@@ -74,6 +74,26 @@ VARIANTS: dict[str, dict[str, str]] = {
     },
 }
 
+def maplesu_payload_enabled() -> bool:
+    """Whether the MapleSU payload participates in this release.
+
+    Default ENABLED so local builds/tests keep the 4-variant contract; the stop-gap
+    release workflow exports ``MAPLESU_PAYLOAD_ENABLED=false`` to drop the known-broken
+    ``ksud-maplesu`` payload entirely (not merely mark it disabled). One switch restores it."""
+    raw = os.environ.get("MAPLESU_PAYLOAD_ENABLED")
+    if raw is None:
+        return True
+    return raw.strip().lower() not in ("false", "0", "no", "")
+
+
+def enabled_variants() -> dict[str, dict[str, str]]:
+    return {
+        name: spec
+        for name, spec in VARIANTS.items()
+        if name != "maplesu" or maplesu_payload_enabled()
+    }
+
+
 MANIFEST_NAME = "versions.properties"
 LOCK_NAME = "payloads.lock.json"
 
@@ -216,6 +236,7 @@ def build_report(payloads: Path, sidecars: Path, max_age_hours: float) -> dict:
 
         entries[variant] = {
             "variant": variant,
+            "disabled": variant == "maplesu" and not maplesu_payload_enabled(),
             "display": spec["display"],
             "source": spec["source"],
             "file": spec["file"],
@@ -278,7 +299,10 @@ def render_manifest(report: dict) -> str:
         entry = report["variants"].get(variant)
         if not entry:
             continue
-        lines.append(f"{variant}={entry['label']}")
+        label = entry["label"]
+        if entry.get("disabled"):
+            label = f"{label} (DISABLED)"
+        lines.append(f"{variant}={label}")
     return "\n".join(lines) + "\n"
 
 
